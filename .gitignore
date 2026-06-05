@@ -35,3 +35,6 @@ coverage/
 # Data (generated)
 data/seed_manifest.json
 data/bench_results.json
+
+# Generated query fixtures (regenerate via scripts/seed.py)
+data/fixtures/

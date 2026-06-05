@@ -460,3 +460,56 @@ describe("Audit Log", () => {
     expect(s.activeModels).toEqual([]); // loaded then unloaded
   });
 });
+
+describe("routing edge cases", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearPairing();
+  });
+
+  // shouldDelegate(query, isImage, hasPeer) === (isImage || query.length > 200) && hasPeer
+  it("treats exactly 200 chars as NOT heavy (boundary is > 200)", () => {
+    expect(shouldDelegate("a".repeat(200), false, true)).toBe(false);
+  });
+
+  it("treats 201 chars as heavy", () => {
+    expect(shouldDelegate("a".repeat(201), false, true)).toBe(true);
+  });
+
+  it("treats 199 chars as NOT heavy", () => {
+    expect(shouldDelegate("a".repeat(199), false, true)).toBe(false);
+  });
+
+  it("never delegates without a peer, however heavy the query", () => {
+    expect(shouldDelegate("a".repeat(5000), false, false)).toBe(false);
+    expect(shouldDelegate("photo", true, false)).toBe(false);
+  });
+
+  it("delegates a short query when it carries an image and a peer exists", () => {
+    expect(shouldDelegate("", true, true)).toBe(true);
+    expect(shouldDelegate("describe this", true, true)).toBe(true);
+  });
+
+  it("handles empty and whitespace-only input as not heavy", () => {
+    expect(shouldDelegate("", false, true)).toBe(false);
+    expect(shouldDelegate("    ", false, true)).toBe(false);
+  });
+
+  it("runRoute delegates a 201-char query to a paired peer", async () => {
+    pairWithProvider("d".repeat(64));
+    mockLoadModel.mockResolvedValue("model-id");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("delegated answer") });
+
+    const r = await runRoute("a".repeat(201), false);
+    expect(r.source).toBe("delegated");
+  });
+
+  it("runRoute keeps a boundary (200-char) query local even with a peer", async () => {
+    pairWithProvider("d".repeat(64));
+    mockLoadModel.mockResolvedValue("model-id");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("local answer") });
+
+    const r = await runRoute("a".repeat(200), false);
+    expect(r.source).toBe("local");
+  });
+});
