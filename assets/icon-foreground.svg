@@ -1,12 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <defs><linearGradient id="ring" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0%" stop-color="#34e2f4"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs>
-  <g fill="none" stroke="url(#ring)" stroke-linecap="round">
-    <circle cx="470" cy="560" r="110" stroke-width="24" opacity="0.95"/>
-    <circle cx="470" cy="560" r="175" stroke-width="17" opacity="0.5"/>
-    <circle cx="470" cy="560" r="240" stroke-width="13" opacity="0.22"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs><filter id="neon" x="-50%" y="-50%" width="200%" height="200%">
+    <feGaussianBlur stdDeviation="9" result="b1"/><feGaussianBlur stdDeviation="20" result="b2"/>
+    <feMerge><feMergeNode in="b2"/><feMergeNode in="b1"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <g transform="translate(256 256) scale(0.78) translate(-256 -256)">
+    <circle cx="256" cy="256" r="160" fill="none" stroke="#06b6d4" stroke-width="8" opacity="0.5" stroke-dasharray="20 10"/>
+    <path d="M 176 176 A 110 110 0 0 1 336 176" fill="none" stroke="#06b6d4" stroke-width="20" stroke-linecap="round" filter="url(#neon)"/>
+    <path d="M 126 126 A 180 180 0 0 1 386 126" fill="none" stroke="#06b6d4" stroke-width="20" stroke-linecap="round" opacity="0.5" filter="url(#neon)"/>
+    <path d="M 256 256 L 143 369" fill="none" stroke="#f59e0b" stroke-width="12" stroke-linecap="round" filter="url(#neon)"/>
+    <path d="M 256 256 L 369 369" fill="none" stroke="#22c55e" stroke-width="12" stroke-linecap="round" filter="url(#neon)"/>
+    <path d="M 256 256 L 256 96" fill="none" stroke="#06b6d4" stroke-width="12" stroke-dasharray="16 16" opacity="0.6"/>
+    <circle cx="256" cy="256" r="48" fill="#0f172a" stroke="#06b6d4" stroke-width="16" filter="url(#neon)"/>
+    <circle cx="256" cy="256" r="20" fill="#ffffff" filter="url(#neon)"/>
+    <circle cx="143" cy="369" r="32" fill="#0f172a" stroke="#f59e0b" stroke-width="12" filter="url(#neon)"/>
+    <circle cx="143" cy="369" r="12" fill="#ffffff"/>
+    <circle cx="369" cy="369" r="32" fill="#0f172a" stroke="#22c55e" stroke-width="12" filter="url(#neon)"/>
+    <circle cx="369" cy="369" r="12" fill="#ffffff"/>
   </g>
-  <line x1="470" y1="560" x2="650" y2="400" stroke="#f59e0b" stroke-width="13" stroke-linecap="round" stroke-dasharray="2 32" opacity="0.9"/>
-  <circle cx="470" cy="560" r="48" fill="#34e2f4"/>
-  <circle cx="650" cy="400" r="38" fill="#f59e0b"/>
 </svg>
