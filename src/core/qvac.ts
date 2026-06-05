@@ -13,6 +13,7 @@ import {
   TTS_EN_SUPERTONIC_Q8_0,
   WHISPER_EN_TINY_Q8_0 as _WHISPER_EN_TINY_Q8_0,
 } from "@qvac/sdk";
+import { recordModelLoad, recordModelUnload, recordCompletion, estimateTokens } from "./audit";
 
 // Define custom constants or fallbacks
 export const MEDPSY_MODEL_ID = "MedPsy-1.7B"; // Default name for MedPsy-1.7B
@@ -82,7 +83,9 @@ export async function loadLLMModel(modelSrc: any = LLAMA_MODEL_ID, delegateParam
       };
     }
 
+    const tLoad = Date.now();
     const modelId = await loadModel(params);
+    recordModelLoad(modelId, params.modelType, Date.now() - tLoad);
     return modelId;
   } catch (error) {
     console.error("Failed to load LLM model:", error);
@@ -93,10 +96,12 @@ export async function loadLLMModel(modelSrc: any = LLAMA_MODEL_ID, delegateParam
 export async function loadEmbeddingModel(modelSrc: any = EMBEDDING_MODEL_ID) {
   try {
     const src = typeof modelSrc === "string" ? modelSrc : modelSrc.src;
+    const tLoad = Date.now();
     const modelId = await loadModel({
       modelSrc: src,
       modelType: "embeddings",
     } as any);
+    recordModelLoad(modelId, "embeddings", Date.now() - tLoad);
     return modelId;
   } catch (error) {
     console.error("Failed to load Embedding model:", error);
@@ -106,6 +111,7 @@ export async function loadEmbeddingModel(modelSrc: any = EMBEDDING_MODEL_ID) {
 
 export async function loadTTSModel(_eSpeakDataPath: string = "./espeak-data") {
   try {
+    const tLoad = Date.now();
     const modelId = await loadModel({
       modelSrc: TTS_EN_SUPERTONIC_Q8_0.src,
       modelType: "tts",
@@ -113,6 +119,7 @@ export async function loadTTSModel(_eSpeakDataPath: string = "./espeak-data") {
         language: "en",
       },
     } as any);
+    recordModelLoad(modelId, "tts", Date.now() - tLoad);
     return modelId;
   } catch (error) {
     console.error("Failed to load TTS model:", error);
@@ -123,6 +130,7 @@ export async function loadTTSModel(_eSpeakDataPath: string = "./espeak-data") {
 export async function unloadQVACModel(modelId: string) {
   try {
     await unloadModel({ modelId });
+    recordModelUnload(modelId);
   } catch (error) {
     console.error(`Failed to unload model ${modelId}:`, error);
   }
@@ -144,14 +152,50 @@ export async function runCompletion(params: CompletionParams): Promise<{ text: s
     }
 
     if (params.stream) {
-      const result = completion({ ...completionParams, stream: true });
-      return {
-        text: "",
-        tokenStream: result.tokenStream,
-      };
+      const result: any = completion({ ...completionParams, stream: true });
+      const stream = result.tokenStream;
+
+      // Instrument only real async token streams so the audit log captures a
+      // true TTFT. Anything else (e.g. a test stub) is passed through untouched.
+      if (stream && typeof stream[Symbol.asyncIterator] === "function") {
+        const tStart = Date.now();
+        const instrumented = (async function* () {
+          let firstTokenMs: number | null = null;
+          let tokenCount = 0;
+          try {
+            for await (const tok of stream) {
+              if (firstTokenMs === null) firstTokenMs = Date.now() - tStart;
+              tokenCount++;
+              yield tok;
+            }
+          } finally {
+            const totalMs = Date.now() - tStart;
+            recordCompletion({
+              modelId: params.modelId,
+              ttftMs: firstTokenMs ?? totalMs,
+              totalMs,
+              tokenCount,
+              streamed: true,
+            });
+          }
+        })();
+        return { text: "", tokenStream: instrumented };
+      }
+
+      return { text: "", tokenStream: stream };
     } else {
+      const tStart = Date.now();
       const result = await completion({ ...completionParams, stream: false });
       const text = await result.text;
+      const totalMs = Date.now() - tStart;
+      // Non-streamed: TTFT is unknown, so it's reported as the full-response
+      // latency with streamed=false to keep the metric honest.
+      recordCompletion({
+        modelId: params.modelId,
+        totalMs,
+        tokenCount: estimateTokens(text),
+        streamed: false,
+      });
       return { text };
     }
   } catch (error) {

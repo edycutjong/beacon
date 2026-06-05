@@ -1,11 +1,27 @@
 import { loadLLMModel, runCompletion, unloadQVACModel, LLAMA_MODEL_ID } from "./qvac";
 import { getPairedProviderKey } from "./p2p";
+import { getAuditLog } from "./audit";
 
 export interface RouteResult {
   text: string;
   source: "local" | "delegated";
   latencyMs: number;
   peerId?: string;
+  /** Output tokens for this answer (from the audit log). */
+  tokenCount?: number;
+  /** Throughput for this answer in tokens/sec (from the audit log). */
+  tokensPerSec?: number;
+}
+
+/** Pull the metrics recorded by runCompletion for the call that just finished. */
+function lastCompletionMetrics(): { tokenCount?: number; tokensPerSec?: number } {
+  const log = getAuditLog();
+  for (let i = log.length - 1; i >= 0; i--) {
+    if (log[i].type === "completion") {
+      return { tokenCount: log[i].tokenCount, tokensPerSec: log[i].tokensPerSec };
+    }
+  }
+  return {};
 }
 
 export function shouldDelegate(query: string, isImage: boolean, hasPeer: boolean): boolean {
@@ -47,7 +63,8 @@ export async function runRoute(query: string, isImage: boolean = false): Promise
         text: response.text,
         source: "delegated",
         latencyMs,
-        peerId: providerKey
+        peerId: providerKey,
+        ...lastCompletionMetrics()
       };
     } catch (error) {
       console.warn("⚠️ Delegated compute failed, falling back to local on-device inference:", error);
@@ -74,6 +91,7 @@ export async function runRoute(query: string, isImage: boolean = false): Promise
   return {
     text: response.text,
     source: "local",
-    latencyMs
+    latencyMs,
+    ...lastCompletionMetrics()
   };
 }

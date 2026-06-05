@@ -11,7 +11,7 @@
    ```
    Pair phone → laptop, send a heavy query → topology shows **DELEGATED → laptop**; stop the provider → it **auto-falls back** to the on-device model (badge flips to LOCAL).
 3. **Verify offline:** `python3 scripts/verify_offline.py` (unplug Wi-Fi first) — scans for banned cloud-SDK imports + asserts network isolation.
-4. **Tests & metrics:** `npm run ci` — typecheck + **31 unit tests** (routing decisions, Ed25519 pairing, fallback). `python3 scripts/bench.py` — local-vs-delegated latency + fallback-switch budgets.
+4. **Tests & metrics:** `npm run ci` — typecheck + **37 unit tests** (routing decisions, Ed25519 pairing, fallback, on-device audit log). `python3 scripts/bench.py` — local-vs-delegated latency + fallback-switch budgets.
 5. **No remote APIs** ([docs/REMOTE_APIS.md](docs/REMOTE_APIS.md)) — all inference is local via `@qvac/sdk`; the P2P link stays on local Wi-Fi and never touches the internet.
 
 > ℹ️ This is a prototype: the provider daemon and on-device models run in a demo/simulated mode (see [Honest Limitations](#️-honest-limitations)). The routing/fallback logic and the offline guarantee are real and unit-tested.
@@ -122,7 +122,7 @@ Run `python3 scripts/bench.py` to reproduce. Results on iPhone 15 + MacBook Pro 
 
 ## 🧪 Testing & CI
 
-**31 unit tests (Vitest)** covering the local-vs-delegate router, Ed25519 P2P pairing, and the auto-fallback path, plus **3 E2E suites (Playwright)** and the offline-verification checks.
+**37 unit tests (Vitest)** covering the local-vs-delegate router, Ed25519 P2P pairing, the auto-fallback path, and the on-device audit log (model loads/unloads · TTFT · tokens/sec), plus **3 E2E suites (Playwright)** and the offline-verification checks.
 
 ## 🔍 Verification & Compliance
 
@@ -130,9 +130,9 @@ Run `python3 scripts/bench.py` to reproduce. Results on iPhone 15 + MacBook Pro 
 |---|---|---|
 | **No remote APIs** — zero cloud | [`docs/REMOTE_APIS.md`](docs/REMOTE_APIS.md) | `python3 scripts/verify_offline.py` scans for cloud SDKs |
 | **Offline proof** — 0 outbound | `scripts/verify_offline.py` | unplug Wi-Fi, then run |
-| **Tests** | `npm run ci` · `npx playwright test` | 31 unit + 3 E2E |
+| **Tests** | `npm run ci` · `npx playwright test` | 37 unit + 3 E2E |
 | **Benchmarks** | `scripts/bench.py` | ⚠️ simulated — re-run on phone+laptop for real numbers |
-| **Audit log** (model loads/unloads · TTFT/tokens/sec) | — | ⏳ not yet implemented (planned) |
+| **Audit log** (model loads/unloads · TTFT/tokens/sec) | `src/core/audit.ts` | ✅ auto-captured on every inference; shown in-app + `getAuditSummary()` |
 
 **5-stage pipeline:** Quality → Security → Build → Offline Verify → Deploy
 

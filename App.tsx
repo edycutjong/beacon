@@ -198,6 +198,13 @@ export default function App() {
                 <Text style={s.latency}>{result.latencyMs}ms</Text>
               </View>
               <Text style={s.resultText}>{result.text}</Text>
+              {result.tokensPerSec != null && (
+                <View style={s.telemetry}>
+                  <Text style={s.telemetryText}>
+                    ⏱ {result.latencyMs}ms · {result.tokenCount ?? 0} tok · {result.tokensPerSec.toFixed(1)} tok/s
+                  </Text>
+                </View>
+              )}
             </View>
           </Animated.View>
         )}
@@ -252,5 +259,7 @@ const s = StyleSheet.create({
   resultSourcePill: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 },
   resultMode: { fontSize: 10, fontWeight: '800', letterSpacing: 1.5, fontFamily: 'monospace' },
   latency: { fontSize: 11, color: C.amber, fontFamily: 'monospace', fontWeight: '700' },
-  resultText: { fontSize: 14, color: C.text, lineHeight: 24 }
+  resultText: { fontSize: 14, color: C.text, lineHeight: 24 },
+  telemetry: { marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border },
+  telemetryText: { fontSize: 11, color: C.text2, fontFamily: 'monospace', letterSpacing: 0.5 }
 });

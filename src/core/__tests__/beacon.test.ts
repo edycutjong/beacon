@@ -52,6 +52,16 @@ import {
   stopP2PProvider,
 } from "../qvac";
 
+import {
+  estimateTokens,
+  recordModelLoad,
+  recordModelUnload,
+  recordCompletion,
+  getAuditLog,
+  clearAuditLog,
+  getAuditSummary,
+} from "../audit";
+
 describe("Beacon Core Module", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -364,5 +374,89 @@ describe("Beacon Core Module", () => {
       });
       expect(resFW).toEqual({ success: true, publicKey: "pubkey" });
     });
+  });
+});
+
+describe("Audit Log", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAuditLog();
+  });
+
+  it("estimates tokens from text length (~4 chars/token)", () => {
+    expect(estimateTokens("")).toBe(0);
+    expect(estimateTokens("abcd")).toBe(1);
+    expect(estimateTokens("a".repeat(40))).toBe(10);
+  });
+
+  it("records model load / unload / completion events", () => {
+    recordModelLoad("m1", "llamacpp-completion", 120);
+    recordCompletion({ modelId: "m1", totalMs: 200, tokenCount: 40, streamed: false });
+    recordModelUnload("m1");
+
+    const log = getAuditLog();
+    expect(log).toHaveLength(3);
+    expect(log[0]).toMatchObject({ type: "model_load", modelId: "m1", loadMs: 120 });
+    // tokens/sec is derived: 40 tokens over 0.2s = 200 tok/s
+    expect(log[1]).toMatchObject({ type: "completion", tokenCount: 40, tokensPerSec: 200, streamed: false });
+    expect(log[2]).toMatchObject({ type: "model_unload", modelId: "m1" });
+  });
+
+  it("summarizes active models and average metrics", () => {
+    recordModelLoad("a", "llamacpp-completion", 100);
+    recordModelLoad("b", "embeddings", 50);
+    recordCompletion({ modelId: "a", ttftMs: 80, totalMs: 100, tokenCount: 50, streamed: true });
+    recordModelUnload("b"); // b loaded then unloaded → not active
+
+    const s = getAuditSummary();
+    expect(s.loads).toBe(2);
+    expect(s.unloads).toBe(1);
+    expect(s.completions).toBe(1);
+    expect(s.activeModels).toEqual(["a"]);
+    expect(s.avgTtftMs).toBe(80);
+    expect(s.avgTokensPerSec).toBeCloseTo(500, 0); // 50 tok / 0.1s
+  });
+
+  it("auto-records a completion event from runCompletion (non-stream)", async () => {
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("a delegated answer of some length") });
+    await runCompletion({ modelId: "mid", history: [{ role: "user", content: "hi" }] });
+
+    const completions = getAuditLog().filter((e) => e.type === "completion");
+    expect(completions).toHaveLength(1);
+    expect(completions[0].streamed).toBe(false);
+    expect(completions[0].tokenCount).toBeGreaterThan(0);
+  });
+
+  it("captures a true TTFT from a real token stream", async () => {
+    async function* fakeStream() {
+      yield "to";
+      yield "ken";
+    }
+    mockCompletion.mockReturnValue({ tokenStream: fakeStream() });
+
+    const res = await runCompletion({ modelId: "mid", history: [], stream: true });
+    // Drain the instrumented stream so the finally-block records the event.
+    const out: string[] = [];
+    for await (const t of res.tokenStream as AsyncGenerator<string>) out.push(t);
+    expect(out).toEqual(["to", "ken"]);
+
+    const completions = getAuditLog().filter((e) => e.type === "completion");
+    expect(completions).toHaveLength(1);
+    expect(completions[0].streamed).toBe(true);
+    expect(completions[0].tokenCount).toBe(2);
+    expect(completions[0].ttftMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("records load + unload through the qvac wrappers", async () => {
+    mockLoadModel.mockResolvedValue("loaded-id");
+    mockUnloadModel.mockResolvedValue(undefined);
+
+    await loadLLMModel();
+    await unloadQVACModel("loaded-id");
+
+    const s = getAuditSummary();
+    expect(s.loads).toBe(1);
+    expect(s.unloads).toBe(1);
+    expect(s.activeModels).toEqual([]); // loaded then unloaded
   });
 });
