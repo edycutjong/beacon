@@ -1,9 +1,27 @@
+## 🧑‍⚖️ For Judges — Review in 5 Steps
+
+> Offline P2P field assistant on `@qvac/sdk`: a phone delegates heavy inference to a nearby laptop over local Wi-Fi — **no internet, no cloud.**
+
+1. **The idea** — [Problem & Solution](#-the-problem--solution) · [Why ONLY QVAC](#-why-only-qvac): on-device small model + transparent P2P **delegate** to a laptop peer, with automatic on-device **fallback**.
+2. **Run it** (Expo app + laptop provider):
+   ```bash
+   npm install && python3 scripts/seed.py
+   node src/node/provider.ts     # laptop-side provider (hosts the large model)
+   npx expo start                # phone app — Expo Go / simulator
+   ```
+   Pair phone → laptop, send a heavy query → topology shows **DELEGATED → laptop**; stop the provider → it **auto-falls back** to the on-device model (badge flips to LOCAL).
+3. **Verify offline:** `python3 scripts/verify_offline.py` (unplug Wi-Fi first) — scans for banned cloud-SDK imports + asserts network isolation.
+4. **Tests & metrics:** `npm run ci` — typecheck + **31 unit tests** (routing decisions, Ed25519 pairing, fallback). `python3 scripts/bench.py` — local-vs-delegated latency + fallback-switch budgets.
+5. **No remote APIs** ([docs/REMOTE_APIS.md](docs/REMOTE_APIS.md)) — all inference is local via `@qvac/sdk`; the P2P link stays on local Wi-Fi and never touches the internet.
+
+> ℹ️ This is a prototype: the provider daemon and on-device models run in a demo/simulated mode (see [Honest Limitations](#️-honest-limitations)). The routing/fallback logic and the offline guarantee are real and unit-tested.
+
+---
+
 <div align="center">
   <h1>Beacon 📡</h1>
   <p><em>Offline P2P field assistant — delegates heavy AI inference from a phone to a nearby laptop via QVAC's peer-to-peer compute mesh. No cloud, no internet, just local Wi-Fi Direct.</em></p>
-  <img src="docs/readme-hero.png" alt="Beacon" width="100%">
 
-  <br/>
 
   [![Built for QVAC Hackathon](https://img.shields.io/badge/DoraHacks-QVAC%20Edge%20AI-8b5cf6?style=for-the-badge)](https://dorahacks.io)
   [![Track](https://img.shields.io/badge/Track-Mobile-06b6d4?style=for-the-badge)](https://dorahacks.io)
@@ -92,7 +110,17 @@ Run `python3 scripts/bench.py` to reproduce. Results on iPhone 15 + MacBook Pro 
 
 ## 🧪 Testing & CI
 
-**3 E2E suites + offline verification checks = 10+ test assertions.** Target: 100+ with unit tests.
+**31 unit tests (Vitest)** covering the local-vs-delegate router, Ed25519 P2P pairing, and the auto-fallback path, plus **3 E2E suites (Playwright)** and the offline-verification checks.
+
+## 🔍 Verification & Compliance
+
+| Gate | Where | How / status |
+|---|---|---|
+| **No remote APIs** — zero cloud | [`docs/REMOTE_APIS.md`](docs/REMOTE_APIS.md) | `python3 scripts/verify_offline.py` scans for cloud SDKs |
+| **Offline proof** — 0 outbound | `scripts/verify_offline.py` | unplug Wi-Fi, then run |
+| **Tests** | `npm run ci` · `npx playwright test` | 31 unit + 3 E2E |
+| **Benchmarks** | `scripts/bench.py` | ⚠️ simulated — re-run on phone+laptop for real numbers |
+| **Audit log** (model loads/unloads · TTFT/tokens/sec) | — | ⏳ not yet implemented (planned) |
 
 **5-stage pipeline:** Quality → Security → Build → Offline Verify → Deploy
 

@@ -1,24 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
-  ScrollView, SafeAreaView, StatusBar, Alert, Dimensions,
+  ScrollView, SafeAreaView, StatusBar, Alert,
 } from 'react-native';
-
-// ── Types ───────────────────────────────────────────────────────────────────
-
-type ComputeMode = 'local' | 'delegated' | 'searching';
-type ConnectionStatus = 'disconnected' | 'paired' | 'connecting';
-
-interface PeerInfo {
-  name: string;
-  publicKey: string;
-}
-
-interface QueryResult {
-  answer: string;
-  mode: ComputeMode;
-  latencyMs: number;
-}
+import { runRoute, type RouteResult } from './src/core/router';
+import { pairWithProvider, getPairedProviderKey, clearPairing } from './src/core/p2p';
 
 // ── Colors ──────────────────────────────────────────────────────────────────
 
@@ -28,55 +14,52 @@ const C = {
   text: '#f1f5f9', text2: '#94a3b8', muted: '#64748b', white: '#fff',
 };
 
-// ── Mock ────────────────────────────────────────────────────────────────────
-
-function mockQuery(text: string, mode: ComputeMode): QueryResult {
-  return {
-    answer: mode === 'delegated'
-      ? `[Delegated to Laptop-01] Based on local RAG search: ${text.length > 30 ? text.slice(0, 30) + '...' : text} — The field manual recommends assessing the situation and following standard protocol. Cross-referenced with 3 local documents.`
-      : `[Local inference] Quick assessment: ${text.length > 30 ? text.slice(0, 30) + '...' : text} — Using on-device small model for rapid response. Limited depth due to phone constraints.`,
-    mode,
-    latencyMs: mode === 'delegated' ? 340 : 820,
-  };
-}
-
 // ── App ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [query, setQuery] = useState('');
-  const [result, setResult] = useState<QueryResult | null>(null);
+  const [result, setResult] = useState<RouteResult | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [mode, setMode] = useState<ComputeMode>('local');
-  const [connection, setConnection] = useState<ConnectionStatus>('disconnected');
-  const [peer, setPeer] = useState<PeerInfo | null>(null);
+  const [providerKey, setProviderKey] = useState('');
+  const [paired, setPaired] = useState<string | null>(getPairedProviderKey());
 
+  // Pair with a laptop provider using its Ed25519 public key (printed by the
+  // provider daemon). Real validation lives in p2p.pairWithProvider().
   const handlePair = useCallback(() => {
-    setConnection('connecting');
-    setTimeout(() => {
-      setPeer({ name: 'Laptop-01', publicKey: 'ed25519:a1b2c3d4e5f6...' });
-      setConnection('paired');
-      setMode('delegated');
-    }, 1200);
-  }, []);
+    try {
+      pairWithProvider(providerKey.trim());
+      setPaired(getPairedProviderKey());
+    } catch (e: unknown) {
+      Alert.alert('Pairing failed', e instanceof Error ? e.message : 'Invalid provider key (64-char hex required).');
+    }
+  }, [providerKey]);
 
   const handleDisconnect = useCallback(() => {
-    setPeer(null);
-    setConnection('disconnected');
-    setMode('local');
-    Alert.alert('Fallback', 'Peer disconnected. Routing to local model.');
+    clearPairing();
+    setPaired(null);
+    Alert.alert('Unpaired', 'Heavy queries will now run on-device (local fallback).');
   }, []);
 
-  const handleSubmit = useCallback(() => {
-    if (!query.trim()) return;
+  // Real inference: the router decides local vs. delegated and falls back
+  // automatically if the peer is unreachable.
+  const handleSubmit = useCallback(async () => {
+    const q = query.trim();
+    if (!q) return;
     setProcessing(true);
-    setTimeout(() => {
-      setResult(mockQuery(query, mode));
+    setResult(null);
+    try {
+      const r = await runRoute(q);
+      setResult(r);
+    } catch (e: unknown) {
+      Alert.alert('Inference failed', e instanceof Error ? e.message : 'Could not run inference. Is the QVAC runtime available on this device?');
+    } finally {
       setProcessing(false);
-    }, mode === 'delegated' ? 600 : 1200);
-  }, [query, mode]);
+    }
+  }, [query]);
 
-  const modeColor = mode === 'delegated' ? C.cyan : mode === 'local' ? C.green : C.amber;
-  const modeLabel = mode === 'delegated' ? `DELEGATED → ${peer?.name}` : 'LOCAL';
+  const delegateReady = paired !== null;
+  const modeColor = delegateReady ? C.cyan : C.green;
+  const modeLabel = delegateReady ? 'DELEGATE READY' : 'LOCAL ONLY';
 
   return (
     <SafeAreaView style={s.container}>
@@ -95,11 +78,11 @@ export default function App() {
 
         {/* Topology Badge */}
         <View style={[s.topoBadge, { backgroundColor: `${modeColor}15`, borderColor: `${modeColor}40` }]}>
-          <Text style={[s.topoIcon, { color: modeColor }]}>{mode === 'delegated' ? '📡' : '📱'}</Text>
+          <Text style={[s.topoIcon, { color: modeColor }]}>{delegateReady ? '📡' : '📱'}</Text>
           <View>
             <Text style={[s.topoLabel, { color: modeColor }]}>{modeLabel}</Text>
             <Text style={s.topoSub}>
-              {mode === 'delegated' ? 'Heavy queries → laptop via P2P mesh' : 'All inference on-device'}
+              {delegateReady ? 'Heavy queries route to the laptop peer' : 'All inference on-device'}
             </Text>
           </View>
         </View>
@@ -107,27 +90,35 @@ export default function App() {
         {/* P2P Controls */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>P2P Compute Mesh</Text>
-          {connection === 'disconnected' && (
-            <TouchableOpacity style={[s.btn, { backgroundColor: C.cyan }]} onPress={handlePair}>
-              <Text style={s.btnText}>🔗 Pair with Laptop Provider</Text>
-            </TouchableOpacity>
+          {!paired && (
+            <>
+              <TextInput
+                style={[s.input, { minHeight: 0, fontFamily: 'monospace', fontSize: 12 }]}
+                placeholder="Paste the laptop provider's public key (64-char hex)"
+                placeholderTextColor={C.muted}
+                value={providerKey}
+                onChangeText={setProviderKey}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={[s.btn, { backgroundColor: C.cyan, marginTop: 12 }, !providerKey.trim() && { opacity: 0.4 }]}
+                onPress={handlePair}
+                disabled={!providerKey.trim()}
+              >
+                <Text style={s.btnText}>🔗 Pair with Laptop Provider</Text>
+              </TouchableOpacity>
+            </>
           )}
-          {connection === 'connecting' && (
-            <View style={[s.btn, { backgroundColor: `${C.amber}20`, borderWidth: 1, borderColor: `${C.amber}40` }]}>
-              <Text style={[s.btnText, { color: C.amber }]}>⏳ Searching for peers...</Text>
-            </View>
-          )}
-          {connection === 'paired' && peer && (
-            <View>
-              <View style={s.peerCard}>
-                <View>
-                  <Text style={s.peerName}>✅ {peer.name}</Text>
-                  <Text style={s.peerKey}>{peer.publicKey}</Text>
-                </View>
-                <TouchableOpacity onPress={handleDisconnect}>
-                  <Text style={{ color: C.red, fontWeight: '700' }}>Disconnect</Text>
-                </TouchableOpacity>
+          {paired && (
+            <View style={s.peerCard}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={s.peerName}>✅ Paired</Text>
+                <Text style={s.peerKey} numberOfLines={1}>{paired}</Text>
               </View>
+              <TouchableOpacity onPress={handleDisconnect}>
+                <Text style={{ color: C.red, fontWeight: '700' }}>Disconnect</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -146,11 +137,11 @@ export default function App() {
             textAlignVertical="top"
           />
           <TouchableOpacity
-            style={[s.btn, { backgroundColor: C.cyan, marginTop: 12 }, !query.trim() && { opacity: 0.4 }]}
+            style={[s.btn, { backgroundColor: C.cyan, marginTop: 12 }, (!query.trim() || processing) && { opacity: 0.4 }]}
             onPress={handleSubmit}
             disabled={!query.trim() || processing}
           >
-            <Text style={s.btnText}>{processing ? '🔄 Processing...' : '🔍 Submit Query'}</Text>
+            <Text style={s.btnText}>{processing ? '🔄 Processing…' : '🔍 Submit Query'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -159,12 +150,12 @@ export default function App() {
           <View style={s.section}>
             <View style={s.resultCard}>
               <View style={s.resultHeader}>
-                <Text style={[s.resultMode, { color: result.mode === 'delegated' ? C.cyan : C.green }]}>
-                  {result.mode === 'delegated' ? '📡 DELEGATED' : '📱 LOCAL'}
+                <Text style={[s.resultMode, { color: result.source === 'delegated' ? C.cyan : C.green }]}>
+                  {result.source === 'delegated' ? '📡 DELEGATED' : '📱 LOCAL'}
                 </Text>
                 <Text style={s.latency}>{result.latencyMs}ms</Text>
               </View>
-              <Text style={s.resultText}>{result.answer}</Text>
+              <Text style={s.resultText}>{result.text}</Text>
             </View>
           </View>
         )}
