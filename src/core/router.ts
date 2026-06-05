@@ -1,5 +1,5 @@
-import { loadLLMModel, runCompletion, unloadQVACModel, LLAMA_MODEL_ID } from "./qvac.js";
-import { getPairedProviderKey } from "./p2p.js";
+import { loadLLMModel, runCompletion, unloadQVACModel, LLAMA_MODEL_ID } from "./qvac";
+import { getPairedProviderKey } from "./p2p";
 
 export interface RouteResult {
   text: string;

@@ -1,4 +1,7 @@
-.PHONY: start typecheck ci test bench verify readiness security-scan
+.PHONY: start provider typecheck ci test bench verify readiness security-scan
+
+provider:
+	npm run provider
 
 start:
 	npm run start

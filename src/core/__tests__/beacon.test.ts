@@ -145,7 +145,7 @@ describe("Beacon Core Module", () => {
       expect(result.peerId).toBe(peerKey);
       expect(mockLoadModel).toHaveBeenCalledWith({
         modelSrc: "llama-model",
-        modelType: "llm",
+        modelType: "llamacpp-completion",
         delegate: {
           providerPublicKey: peerKey,
           timeout: 10000,
@@ -181,7 +181,7 @@ describe("Beacon Core Module", () => {
       expect(result.text).toBe("local concise answer");
       expect(mockLoadModel).toHaveBeenCalledWith({
         modelSrc: "llama-model",
-        modelType: "llm",
+        modelType: "llamacpp-completion",
       });
     });
   });
@@ -217,7 +217,7 @@ describe("Beacon Core Module", () => {
       expect(id).toBe("mock-llm-id");
       expect(mockLoadModel).toHaveBeenCalledWith({
         modelSrc: "custom-src",
-        modelType: "llm",
+        modelType: "llamacpp-completion",
         delegate: {
           providerPublicKey: "pubkey",
           timeout: 30000,

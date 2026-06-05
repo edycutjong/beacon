@@ -9,6 +9,10 @@ node_modules/
 # Build output
 dist/
 
+# Expo Native Builds
+ios/
+android/
+
 # Expo
 .expo/
 web-build/

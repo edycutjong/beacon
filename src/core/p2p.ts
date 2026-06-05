@@ -1,4 +1,4 @@
-import { startP2PProvider, stopP2PProvider } from "./qvac.js";
+import { startP2PProvider, stopP2PProvider } from "./qvac";
 
 let pairedProviderKey: string | null = null;
 

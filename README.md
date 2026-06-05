@@ -19,6 +19,8 @@
 ---
 
 <div align="center">
+  <img src="docs/icon.svg" alt="Beacon" width="120" height="120">
+
   <h1>Beacon 📡</h1>
   <p><em>Offline P2P field assistant — delegates heavy AI inference from a phone to a nearby laptop via QVAC's peer-to-peer compute mesh. No cloud, no internet, just local Wi-Fi Direct.</em></p>
 
@@ -82,6 +84,16 @@ In field conditions — disaster zones, remote construction sites, wilderness �
 
 ## 🚀 Getting Started
 
+**Prerequisites for iOS (macOS only):**
+Because Beacon uses custom native C++ modules (`@qvac/sdk` and `BareKit`), you must have a modern version of CocoaPods (≥ 1.14.0) installed to compile the app. 
+```bash
+# If using Homebrew (Recommended)
+brew upgrade cocoapods
+# OR if using RubyGems
+sudo gem install cocoapods
+```
+
+**Installation & Run:**
 ```bash
 git clone https://github.com/edycutjong/beacon.git
 cd beacon
@@ -89,10 +101,10 @@ npm install
 python3 scripts/seed.py
 
 # Start laptop provider
-node src/node/provider.ts
+npm run provider
 
-# Start phone app
-npx expo start
+# Compile and start the custom native iOS app
+npm run ios
 ```
 
 ## 📊 Benchmarks

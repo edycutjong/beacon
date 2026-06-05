@@ -1,4 +1,4 @@
-import { startBeaconHost } from "../core/p2p.js";
+import { startBeaconHost } from "../core/p2p";
 
 async function main() {
   const topic = process.env.BEACON_TOPIC || "beacon-field-compute";

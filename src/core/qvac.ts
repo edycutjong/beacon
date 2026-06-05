@@ -70,7 +70,7 @@ export async function loadLLMModel(modelSrc: any = LLAMA_MODEL_ID, delegateParam
     const src = typeof modelSrc === "string" ? modelSrc : modelSrc.src;
     const params: any = {
       modelSrc: src,
-      modelType: "llm",
+      modelType: "llamacpp-completion",
     };
 
     if (delegateParams) {

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#082f49"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+    <filter id="neon" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="blur1" />
+      <feGaussianBlur stdDeviation="24" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <pattern id="dotGrid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <circle cx="4" cy="4" r="2" fill="#06b6d4" fill-opacity="0.15"/>
+    </pattern>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#dotGrid)"/>
+
+  <!-- Outer Orbit / Mesh Ring -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#0f172a" stroke-width="32"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#06b6d4" stroke-width="8" opacity="0.5" stroke-dasharray="20 10"/>
+
+  <!-- Emitting Radio Waves (Upwards) -->
+  <path d="M 176 176 A 110 110 0 0 1 336 176" fill="none" stroke="#06b6d4" stroke-width="20" stroke-linecap="round" filter="url(#neon)"/>
+  <path d="M 126 126 A 180 180 0 0 1 386 126" fill="none" stroke="#06b6d4" stroke-width="20" stroke-linecap="round" opacity="0.5" filter="url(#neon)"/>
+
+  <!-- Mesh Connections (Inner lines from center to orbit) -->
+  <path d="M 256 256 L 143 369" fill="none" stroke="#f59e0b" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" filter="url(#neon)"/>
+  <path d="M 256 256 L 369 369" fill="none" stroke="#22c55e" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" filter="url(#neon)"/>
+  <path d="M 256 256 L 256 96" fill="none" stroke="#06b6d4" stroke-width="12" stroke-dasharray="16 16" opacity="0.6"/>
+
+  <!-- Central Core (Phone / Router) -->
+  <circle cx="256" cy="256" r="48" fill="#0f172a" stroke="#06b6d4" stroke-width="16" filter="url(#neon)"/>
+  <circle cx="256" cy="256" r="20" fill="#ffffff" filter="url(#neon)"/>
+
+  <!-- Satellite Node 1 (Amber: Heavy AI Delegate) -->
+  <circle cx="143" cy="369" r="32" fill="#0f172a" stroke="#f59e0b" stroke-width="12" filter="url(#neon)"/>
+  <circle cx="143" cy="369" r="12" fill="#ffffff"/>
+
+  <!-- Satellite Node 2 (Green: Local AI Fallback) -->
+  <circle cx="369" cy="369" r="32" fill="#0f172a" stroke="#22c55e" stroke-width="12" filter="url(#neon)"/>
+  <circle cx="369" cy="369" r="12" fill="#ffffff"/>
+  
+</svg>

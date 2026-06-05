@@ -1,20 +1,29 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
-  ScrollView, SafeAreaView, StatusBar, Alert,
+  ScrollView, StatusBar, Alert, Animated, Easing
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { runRoute, type RouteResult } from './src/core/router';
 import { pairWithProvider, getPairedProviderKey, clearPairing } from './src/core/p2p';
 
 // ── Colors ──────────────────────────────────────────────────────────────────
-
 const C = {
-  bg: '#0a0e1a', card: '#111827', border: '#1e293b',
-  cyan: '#06b6d4', green: '#22c55e', amber: '#f59e0b', red: '#ef4444',
-  text: '#f1f5f9', text2: '#94a3b8', muted: '#64748b', white: '#fff',
+  bg: '#050914',
+  card: '#0a101f',
+  cardActive: '#0f172a',
+  border: '#1e293b',
+  borderGlow: '#38bdf8',
+  cyan: '#06b6d4',
+  green: '#22c55e',
+  amber: '#f59e0b',
+  red: '#ef4444',
+  text: '#f8fafc',
+  text2: '#94a3b8',
+  muted: '#475569',
+  white: '#ffffff',
+  glass: 'rgba(15, 23, 42, 0.75)'
 };
-
-// ── App ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [query, setQuery] = useState('');
@@ -22,26 +31,41 @@ export default function App() {
   const [processing, setProcessing] = useState(false);
   const [providerKey, setProviderKey] = useState('');
   const [paired, setPaired] = useState<string | null>(getPairedProviderKey());
+  
+  // Animations
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Pair with a laptop provider using its Ed25519 public key (printed by the
-  // provider daemon). Real validation lives in p2p.pairWithProvider().
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  useEffect(() => {
+    if (result) {
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }
+  }, [result, fadeAnim]);
+
   const handlePair = useCallback(() => {
     try {
       pairWithProvider(providerKey.trim());
       setPaired(getPairedProviderKey());
     } catch (e: unknown) {
-      Alert.alert('Pairing failed', e instanceof Error ? e.message : 'Invalid provider key (64-char hex required).');
+      Alert.alert('Pairing failed', e instanceof Error ? e.message : 'Invalid provider key.');
     }
   }, [providerKey]);
 
   const handleDisconnect = useCallback(() => {
     clearPairing();
     setPaired(null);
-    Alert.alert('Unpaired', 'Heavy queries will now run on-device (local fallback).');
   }, []);
 
-  // Real inference: the router decides local vs. delegated and falls back
-  // automatically if the peer is unreachable.
   const handleSubmit = useCallback(async () => {
     const q = query.trim();
     if (!q) return;
@@ -51,7 +75,7 @@ export default function App() {
       const r = await runRoute(q);
       setResult(r);
     } catch (e: unknown) {
-      Alert.alert('Inference failed', e instanceof Error ? e.message : 'Could not run inference. Is the QVAC runtime available on this device?');
+      Alert.alert('Inference failed', e instanceof Error ? e.message : 'Is QVAC runtime available?');
     } finally {
       setProcessing(false);
     }
@@ -59,42 +83,50 @@ export default function App() {
 
   const delegateReady = paired !== null;
   const modeColor = delegateReady ? C.cyan : C.green;
-  const modeLabel = delegateReady ? 'DELEGATE READY' : 'LOCAL ONLY';
+  const modeLabel = delegateReady ? 'LINK ESTABLISHED' : 'LOCAL SANDBOX';
 
   return (
-    <SafeAreaView style={s.container}>
-      <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+    <SafeAreaProvider>
+      <SafeAreaView style={s.container}>
+        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-        {/* Header */}
+        
+        {/* Header Dashboard */}
         <View style={s.header}>
-          <Text style={{ fontSize: 48 }}>📡</Text>
-          <Text style={s.title}>Beacon</Text>
-          <Text style={s.subtitle}>P2P Field Assistant</Text>
+          <View style={s.headerTop}>
+            <Text style={s.logoIcon}>📡</Text>
+            <View>
+              <Text style={s.title}>BEACON</Text>
+              <Text style={s.subtitle}>P2P FIELD ASSISTANT_v1.0</Text>
+            </View>
+          </View>
           <View style={[s.pill, { borderColor: `${C.green}50`, backgroundColor: `${C.green}15` }]}>
             <View style={[s.dot, { backgroundColor: C.green }]} />
-            <Text style={[s.pillText, { color: C.green }]}>OFFLINE · QVAC</Text>
+            <Text style={[s.pillText, { color: C.green }]}>SYS: OFFLINE · QVAC</Text>
           </View>
         </View>
 
-        {/* Topology Badge */}
-        <View style={[s.topoBadge, { backgroundColor: `${modeColor}15`, borderColor: `${modeColor}40` }]}>
-          <Text style={[s.topoIcon, { color: modeColor }]}>{delegateReady ? '📡' : '📱'}</Text>
-          <View>
+        {/* Topology Matrix */}
+        <Animated.View style={[s.topoBadge, { borderColor: `${modeColor}50`, backgroundColor: `${modeColor}10`, transform: [{ scale: delegateReady ? pulseAnim : 1 }] }]}>
+          <View style={s.topoIconWrapper}>
+            <Text style={s.topoIcon}>{delegateReady ? '📡' : '📱'}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
             <Text style={[s.topoLabel, { color: modeColor }]}>{modeLabel}</Text>
             <Text style={s.topoSub}>
-              {delegateReady ? 'Heavy queries route to the laptop peer' : 'All inference on-device'}
+              {delegateReady ? 'Heavy compute routed to external node' : 'All operations restricted to internal logic'}
             </Text>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* P2P Controls */}
+        {/* Uplink Controls */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>P2P Compute Mesh</Text>
-          {!paired && (
-            <>
+          <Text style={s.sectionTitle}>[ NETWORK UPLINK ]</Text>
+          {!paired ? (
+            <View style={s.glassCard}>
               <TextInput
-                style={[s.input, { minHeight: 0, fontFamily: 'monospace', fontSize: 12 }]}
-                placeholder="Paste the laptop provider's public key (64-char hex)"
+                style={s.inputMono}
+                placeholder="AWAITING PUBLIC KEY HEX [64-CHAR]..."
                 placeholderTextColor={C.muted}
                 value={providerKey}
                 onChangeText={setProviderKey}
@@ -102,107 +134,123 @@ export default function App() {
                 autoCorrect={false}
               />
               <TouchableOpacity
-                style={[s.btn, { backgroundColor: C.cyan, marginTop: 12 }, !providerKey.trim() && { opacity: 0.4 }]}
+                style={[s.btn, { backgroundColor: C.cyan }, !providerKey.trim() && { opacity: 0.3 }]}
                 onPress={handlePair}
                 disabled={!providerKey.trim()}
               >
-                <Text style={s.btnText}>🔗 Pair with Laptop Provider</Text>
+                <Text style={[s.btnText, { color: C.bg }]}>INITIALIZE PAIRING</Text>
               </TouchableOpacity>
-            </>
-          )}
-          {paired && (
-            <View style={s.peerCard}>
-              <View style={{ flex: 1, paddingRight: 12 }}>
-                <Text style={s.peerName}>✅ Paired</Text>
+            </View>
+          ) : (
+            <View style={[s.glassCard, { borderColor: C.cyan }]}>
+              <View style={s.peerInfo}>
+                <Text style={s.peerStatus}>UPLINK SECURED</Text>
                 <Text style={s.peerKey} numberOfLines={1}>{paired}</Text>
               </View>
-              <TouchableOpacity onPress={handleDisconnect}>
-                <Text style={{ color: C.red, fontWeight: '700' }}>Disconnect</Text>
+              <TouchableOpacity style={s.btnDanger} onPress={handleDisconnect}>
+                <Text style={s.btnDangerText}>SEVER CONNECTION</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Query Input */}
+        {/* Data Query */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Ask a Question</Text>
-          <TextInput
-            style={s.input}
-            placeholder="e.g. What's the protocol for water contamination?"
-            placeholderTextColor={C.muted}
-            value={query}
-            onChangeText={setQuery}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-          <TouchableOpacity
-            style={[s.btn, { backgroundColor: C.cyan, marginTop: 12 }, (!query.trim() || processing) && { opacity: 0.4 }]}
-            onPress={handleSubmit}
-            disabled={!query.trim() || processing}
-          >
-            <Text style={s.btnText}>{processing ? '🔄 Processing…' : '🔍 Submit Query'}</Text>
-          </TouchableOpacity>
+          <Text style={s.sectionTitle}>[ QUERY CONSOLE ]</Text>
+          <View style={s.glassCard}>
+            <TextInput
+              style={s.inputArea}
+              placeholder="Enter analysis parameters..."
+              placeholderTextColor={C.muted}
+              value={query}
+              onChangeText={setQuery}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+            <TouchableOpacity
+              style={[
+                s.btn, 
+                { backgroundColor: processing ? C.amber : C.green }, 
+                (!query.trim() || processing) && { opacity: 0.5 }
+              ]}
+              onPress={handleSubmit}
+              disabled={!query.trim() || processing}
+            >
+              <Text style={[s.btnText, { color: C.bg }]}>
+                {processing ? 'EXECUTING PROTOCOL...' : 'EXECUTE QUERY'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Result */}
+        {/* Results Stream */}
         {result && (
-          <View style={s.section}>
-            <View style={s.resultCard}>
+          <Animated.View style={[s.section, { opacity: fadeAnim }]}>
+            <Text style={s.sectionTitle}>[ OUTPUT DATA ]</Text>
+            <View style={[s.resultCard, { borderColor: result.source === 'delegated' ? C.cyan : C.green }]}>
               <View style={s.resultHeader}>
-                <Text style={[s.resultMode, { color: result.source === 'delegated' ? C.cyan : C.green }]}>
-                  {result.source === 'delegated' ? '📡 DELEGATED' : '📱 LOCAL'}
-                </Text>
+                <View style={s.resultSourcePill}>
+                  <Text style={[s.resultMode, { color: result.source === 'delegated' ? C.cyan : C.green }]}>
+                    SRC: {result.source === 'delegated' ? 'EXTERNAL' : 'INTERNAL'}
+                  </Text>
+                </View>
                 <Text style={s.latency}>{result.latencyMs}ms</Text>
               </View>
               <Text style={s.resultText}>{result.text}</Text>
             </View>
-          </View>
+          </Animated.View>
         )}
 
-        {/* Model Info */}
-        <View style={{ alignItems: 'center', paddingTop: 20 }}>
-          <Text style={{ fontSize: 11, color: C.muted }}>
-            Local: Llama 3.2 1B · Delegate: Llama 3.2 via P2P · RAG: GTE-Large-FP16
-          </Text>
-        </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
 // ── Styles ──────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
-  scroll: { padding: 20, paddingBottom: 40 },
-  header: { alignItems: 'center', marginBottom: 24 },
-  title: { fontSize: 32, fontWeight: '800', color: C.white, letterSpacing: 1 },
-  subtitle: { fontSize: 14, color: C.text2, marginTop: 4 },
-  pill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, marginTop: 12, borderWidth: 1 },
-  dot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-  pillText: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
+  scroll: { padding: 20, paddingBottom: 60 },
+  
+  header: { marginBottom: 30, marginTop: 10 },
+  headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  logoIcon: { fontSize: 42, marginRight: 12, textShadowColor: C.cyan, textShadowOffset: {width: 0, height: 0}, textShadowRadius: 10 },
+  title: { fontSize: 28, fontWeight: '900', color: C.text, letterSpacing: 4, fontFamily: 'monospace' },
+  subtitle: { fontSize: 12, color: C.cyan, fontWeight: '700', letterSpacing: 2, fontFamily: 'monospace' },
+  
+  pill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1 },
+  dot: { width: 6, height: 6, borderRadius: 3, marginRight: 8 },
+  pillText: { fontSize: 10, fontWeight: '800', letterSpacing: 2, fontFamily: 'monospace' },
 
-  topoBadge: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 20, gap: 14 },
-  topoIcon: { fontSize: 28 },
-  topoLabel: { fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  topoSub: { fontSize: 12, color: C.text2, marginTop: 2 },
+  topoBadge: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 16, marginBottom: 24, shadowColor: C.cyan, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 10 },
+  topoIconWrapper: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center', marginRight: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  topoIcon: { fontSize: 20 },
+  topoLabel: { fontSize: 14, fontWeight: '800', letterSpacing: 2, fontFamily: 'monospace', marginBottom: 4 },
+  topoSub: { fontSize: 11, color: C.text2, lineHeight: 16 },
 
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 10 },
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', color: C.text2, letterSpacing: 2, fontFamily: 'monospace', marginBottom: 12 },
+  
+  glassCard: { backgroundColor: C.glass, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 16 },
+  
+  inputMono: { backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: '#334155', borderRadius: 8, padding: 14, color: C.cyan, fontSize: 11, fontFamily: 'monospace', marginBottom: 16 },
+  inputArea: { backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: '#334155', borderRadius: 8, padding: 16, color: C.text, fontSize: 14, minHeight: 100, lineHeight: 22, marginBottom: 16 },
+  
+  btn: { borderRadius: 8, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  btnText: { fontSize: 13, fontWeight: '900', letterSpacing: 2, fontFamily: 'monospace' },
+  
+  btnDanger: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 1, borderColor: C.red, borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  btnDangerText: { color: C.red, fontSize: 11, fontWeight: '800', letterSpacing: 1.5, fontFamily: 'monospace' },
 
-  btn: { borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  btnText: { fontSize: 15, fontWeight: '700', color: C.bg },
+  peerInfo: { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#334155' },
+  peerStatus: { fontSize: 11, color: C.cyan, fontWeight: '800', letterSpacing: 2, fontFamily: 'monospace', marginBottom: 6 },
+  peerKey: { fontSize: 10, color: C.text2, fontFamily: 'monospace' },
 
-  peerCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 14 },
-  peerName: { fontSize: 15, color: C.green, fontWeight: '700' },
-  peerKey: { fontSize: 11, color: C.muted, marginTop: 2, fontFamily: 'monospace' },
-
-  input: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 16, color: C.text, fontSize: 15, minHeight: 80, lineHeight: 22 },
-
-  resultCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 18 },
-  resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  resultMode: { fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  latency: { fontSize: 11, color: C.muted, fontFamily: 'monospace' },
-  resultText: { fontSize: 14, color: C.text, lineHeight: 22 },
+  resultCard: { backgroundColor: C.glass, borderWidth: 1, borderRadius: 12, padding: 16, borderLeftWidth: 4 },
+  resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 12 },
+  resultSourcePill: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 },
+  resultMode: { fontSize: 10, fontWeight: '800', letterSpacing: 1.5, fontFamily: 'monospace' },
+  latency: { fontSize: 11, color: C.amber, fontFamily: 'monospace', fontWeight: '700' },
+  resultText: { fontSize: 14, color: C.text, lineHeight: 24 }
 });

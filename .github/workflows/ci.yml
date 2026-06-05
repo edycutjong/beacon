@@ -109,14 +109,37 @@ jobs:
 
   # ── STAGE 5: Deploy Gate (main only) ──────────────────────
   deploy-gate:
-    name: "Stage 5 · Deploy Gate"
+    name: "Stage 5 · Deploy Gate & Build APK"
     needs: [build, offline-verify, secret-scan, dependency-audit]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      - name: Install dependencies
+        run: npm install
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android
+      - name: Build APK
+        run: cd android && ./gradlew assembleRelease
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: beacon-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
       - name: All gates passed
         run: |
-          echo "🚀 All CI/CD gates passed!"
+          echo "🚀 All CI/CD gates passed and APK built successfully!"
           echo ""
           echo "Pipeline Summary:"
           echo "  ✅ Stage 1 — Code Quality (typecheck, lint)"
@@ -124,3 +147,4 @@ jobs:
           echo "  ✅ Stage 2 — Dependency Audit (npm)"
           echo "  ✅ Stage 3 — Build Verification (Expo)"
           echo "  ✅ Stage 4 — Offline Verification"
+          echo "  ✅ Stage 5 — Deploy Gate (APK Built & Hosted)"
