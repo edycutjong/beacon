@@ -44,8 +44,8 @@ function parseInline(line: string): InlineToken[] {
     if (tok.startsWith('`')) {
       tokens.push({ t: 'code', v: tok.slice(1, -1) });
     } else if (tok.startsWith('[')) {
-      const lm = tok.match(/\[([^\]]+)\]\(([^)]+)\)/);
-      if (lm) tokens.push({ t: 'link', v: lm[1], href: lm[2] });
+      const lm = tok.match(/\[([^\]]+)\]\(([^)]+)\)/)!;
+      tokens.push({ t: 'link', v: lm[1], href: lm[2] });
     } else if (tok.startsWith('**')) {
       tokens.push({ t: 'bold', v: tok.slice(2, -2) });
     } else {
@@ -154,8 +154,8 @@ export default function Markdown({ children }: { children: string }) {
         if (om) {
           items.push({ ordered: true, marker: `${om[1]}.`, text: om[2] });
         } else {
-          const um = lines[i].match(/^\s*[-*+]\s+(.*)$/);
-          items.push({ ordered: false, marker: '•', text: um ? um[1] : '' });
+          const um = lines[i].match(/^\s*[-*+]\s+(.*)$/)!;
+          items.push({ ordered: false, marker: '•', text: um[1] });
         }
         i++;
       }

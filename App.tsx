@@ -1,5 +1,5 @@
 import * as Linking from 'expo-linking';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert, Animated, Easing, Image, ScrollView, StatusBar, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
@@ -38,6 +38,45 @@ interface HistoryEntry {
   result: RouteResult;
 }
 
+interface SourceStats {
+  runs: number;
+  avgLatencyMs: number;
+  avgTokensPerSec: number | null;
+}
+
+interface PerfReport {
+  local: SourceStats | null;
+  delegated: SourceStats | null;
+  /** How many times faster the mesh is than on-device (latency ratio), when both exist. */
+  latencySpeedup: number | null;
+  /** Throughput multiplier mesh vs on-device, when both report tok/s. */
+  throughputGain: number | null;
+}
+
+function aggregate(entries: HistoryEntry[], source: RouteResult['source']): SourceStats | null {
+  const rows = entries.filter((e) => e.result.source === source);
+  if (rows.length === 0) return null;
+  const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const tps = rows.map((r) => r.result.tokensPerSec).filter((n): n is number => n != null && n > 0);
+  return {
+    runs: rows.length,
+    avgLatencyMs: Math.round(avg(rows.map((r) => r.result.latencyMs))),
+    avgTokensPerSec: tps.length ? avg(tps) : null,
+  };
+}
+
+function buildPerfReport(entries: HistoryEntry[]): PerfReport {
+  const local = aggregate(entries, 'local');
+  const delegated = aggregate(entries, 'delegated');
+  const latencySpeedup =
+    local && delegated && delegated.avgLatencyMs > 0 ? local.avgLatencyMs / delegated.avgLatencyMs : null;
+  const throughputGain =
+    local?.avgTokensPerSec && delegated?.avgTokensPerSec
+      ? delegated.avgTokensPerSec / local.avgTokensPerSec
+      : null;
+  return { local, delegated, latencySpeedup, throughputGain };
+}
+
 const QUICK_PROMPTS = [
   { label: '⛑ Trauma triage', text: 'Patient has a deep bleeding leg wound in the field. What are the immediate triage steps?' },
   { label: '🧭 Navigation', text: 'How do I navigate to safety at night without GPS using only a compass and the stars?' },
@@ -61,6 +100,7 @@ export default function App() {
   const [transcribing, setTranscribing] = useState(false);
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const voiceSupported = isVoiceAvailable();
+  const perf = useMemo(() => buildPerfReport(history), [history]);
 
   // Probe NFC hardware once so the tap-to-pair button only shows when usable.
   useEffect(() => {
@@ -393,6 +433,31 @@ export default function App() {
             </Animated.View>
           )}
 
+          {/* Delegation performance — local vs mesh, from real session telemetry */}
+          {(perf.local || perf.delegated) && (
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>[ DELEGATION PERFORMANCE ]</Text>
+              <View style={s.glassCard}>
+                {perf.latencySpeedup != null && perf.latencySpeedup >= 1 && (
+                  <View style={s.perfHeadline}>
+                    <Text style={s.perfHeadlineNum}>{perf.latencySpeedup.toFixed(1)}×</Text>
+                    <Text style={s.perfHeadlineLabel}>
+                      FASTER ON MESH{perf.throughputGain ? ` · ${perf.throughputGain.toFixed(1)}× THROUGHPUT` : ''}
+                    </Text>
+                  </View>
+                )}
+                <View style={s.perfCols}>
+                  <PerfColumn label="ON-DEVICE" color={C.green} stats={perf.local} />
+                  <View style={s.perfDivider} />
+                  <PerfColumn label="EXTERNAL MESH" color={C.amber} stats={perf.delegated} />
+                </View>
+                <Text style={s.perfFootnote}>
+                  Measured on-device · {(perf.local?.runs ?? 0) + (perf.delegated?.runs ?? 0)} run(s) this session
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Session log */}
           {history.length > 1 && (
             <View style={s.section}>
@@ -491,6 +556,31 @@ function ResultCard({ result, canSpeak }: { result: RouteResult; canSpeak: boole
             ⏱ {result.latencyMs}ms · {result.tokenCount ?? 0} tok · {result.tokensPerSec.toFixed(1)} tok/s
           </Text>
         </View>
+      )}
+    </View>
+  );
+}
+
+// ── Delegation performance column ───────────────────────────────────────────
+function PerfColumn({ label, color, stats }: { label: string; color: string; stats: SourceStats | null }) {
+  return (
+    <View style={s.perfCol}>
+      <View style={s.perfColHead}>
+        <View style={[s.dot, { backgroundColor: color }]} />
+        <Text style={[s.perfColLabel, { color }]}>{label}</Text>
+      </View>
+      {stats ? (
+        <>
+          <Text style={s.perfMetric}>{stats.avgLatencyMs}<Text style={s.perfUnit}>ms</Text></Text>
+          <Text style={s.perfMetricSub}>avg latency</Text>
+          <Text style={s.perfMetric2}>
+            {stats.avgTokensPerSec != null ? stats.avgTokensPerSec.toFixed(1) : '—'}
+            <Text style={s.perfUnit}> tok/s</Text>
+          </Text>
+          <Text style={s.perfRuns}>{stats.runs} run{stats.runs === 1 ? '' : 's'}</Text>
+        </>
+      ) : (
+        <Text style={s.perfEmpty}>No runs yet</Text>
       )}
     </View>
   );
@@ -599,6 +689,22 @@ const s = StyleSheet.create({
 
   telemetry: { marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border },
   telemetryText: { fontSize: 11, color: C.text2, fontFamily: 'monospace', letterSpacing: 0.5 },
+
+  perfHeadline: { alignItems: 'center', marginBottom: 18, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: C.border },
+  perfHeadlineNum: { fontSize: 40, fontWeight: '900', color: C.amber, fontFamily: 'monospace', letterSpacing: 1, textShadowColor: `${C.amber}66`, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 16 },
+  perfHeadlineLabel: { fontSize: 10, fontWeight: '800', color: C.text2, letterSpacing: 2, fontFamily: 'monospace', marginTop: 4 },
+  perfCols: { flexDirection: 'row', alignItems: 'stretch' },
+  perfCol: { flex: 1, alignItems: 'center' },
+  perfColHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  perfColLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.5, fontFamily: 'monospace' },
+  perfDivider: { width: 1, backgroundColor: C.border, marginHorizontal: 8 },
+  perfMetric: { fontSize: 26, fontWeight: '900', color: C.text, fontFamily: 'monospace' },
+  perfMetric2: { fontSize: 20, fontWeight: '800', color: C.text, fontFamily: 'monospace', marginTop: 8 },
+  perfUnit: { fontSize: 12, fontWeight: '700', color: C.text2 },
+  perfMetricSub: { fontSize: 9, color: C.muted, letterSpacing: 1, fontFamily: 'monospace', marginTop: 2 },
+  perfRuns: { fontSize: 9, color: C.muted, letterSpacing: 1, fontFamily: 'monospace', marginTop: 6 },
+  perfEmpty: { fontSize: 11, color: C.muted, fontStyle: 'italic', marginTop: 16 },
+  perfFootnote: { fontSize: 9, color: C.muted, letterSpacing: 1, fontFamily: 'monospace', textAlign: 'center', marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.border },
 
   logRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
   logDot: { width: 7, height: 7, borderRadius: 4 },

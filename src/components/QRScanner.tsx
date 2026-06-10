@@ -63,7 +63,6 @@ export default function QRScanner({ visible, onClose, onScan }: Props) {
   }, [visible, scanLine]);
 
   const handleScan = (data: string) => {
-    if (scanned) return;
     const key = extractProviderKey(data);
     if (!key) {
       setError('No valid 64-char uplink key found in this code.');
