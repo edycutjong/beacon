@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@qvac/sdk": "latest",
-    "expo": "~56.0.8",
+    "@qvac/sdk": "^0.10.2",
+    "expo": "^56.0.9",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -14,7 +14,7 @@
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
-    "@lhci/cli": "^0.14.0",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.52.0",
     "@types/node": "^22.0.0",
     "@types/react": "~19.2.2",
@@ -39,6 +39,10 @@
     "lint": "expo lint",
     "lint:fix": "eslint . --fix",
     "ci": "npm run lint && npm run typecheck && npm test"
+  },
+  "overrides": {
+    "tmp": "^0.2.7",
+    "uuid": "^11.1.1"
   },
   "private": true
 }
