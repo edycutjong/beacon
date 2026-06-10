@@ -1,4 +1,4 @@
-import { startP2PProvider, stopP2PProvider } from "./qvac.ts";
+import { startP2PProvider, stopP2PProvider, runHeartbeat } from "./qvac.ts";
 
 let pairedProviderKey: string | null = null;
 
@@ -28,7 +28,7 @@ export async function stopBeaconHost(): Promise<void> {
   await stopP2PProvider();
 }
 
-export function pairWithProvider(publicKey: string): void {
+export async function pairWithProvider(publicKey: string): Promise<void> {
   // Validate public key format (64-character hex representing a 32-byte Ed25519 key)
   const hexRegex = /^[0-9a-fA-F]{64}$/;
   const isValid = hexRegex.test(publicKey);
@@ -36,6 +36,12 @@ export function pairWithProvider(publicKey: string): void {
     console.warn("Invalid public key provided to pairWithProvider:", publicKey);
     throw new Error("Invalid public key format. Must be a 64-character hex string.");
   }
+
+  const isOnline = await runHeartbeat(publicKey);
+  if (!isOnline) {
+    throw new Error("Provider is unreachable. Check the uplink key and ensure the host is online.");
+  }
+
   pairedProviderKey = publicKey;
   console.log(`✅ Paired successfully with provider: ${publicKey}`);
 }

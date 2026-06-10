@@ -5,7 +5,7 @@ export default {
     "@qvac/sdk/whispercpp-transcription/plugin",
     "@qvac/sdk/parakeet-transcription/plugin",
     "@qvac/sdk/nmtcpp-translation/plugin",
-    "@qvac/sdk/onnx-tts/plugin",
+    "@qvac/sdk/tts-ggml/plugin",
     "@qvac/sdk/onnx-ocr/plugin",
     "@qvac/sdk/sdcpp-generation/plugin"
   ]

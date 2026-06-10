@@ -3,24 +3,30 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@qvac/sdk": "^0.10.2",
+    "@qvac/sdk": "^0.12.2",
     "expo": "^56.0.9",
+    "expo-audio": "~56.0.11",
+    "expo-camera": "~56.0.7",
+    "expo-linking": "~56.0.13",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
-    "react-native-bare-kit": "latest",
-    "react-native-safe-area-context": "latest",
+    "react-native-bare-kit": "^0.14.3",
+    "react-native-nfc-manager": "^3.17.2",
+    "react-native-safe-area-context": "^5.8.0",
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.52.0",
     "@types/node": "^22.0.0",
+    "@types/qrcode-terminal": "^0.12.2",
     "@types/react": "~19.2.2",
     "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~56.0.4",
+    "qrcode-terminal": "^0.12.0",
     "tsx": "^4.19.0",
     "typescript": "~6.0.3",
     "vitest": "^4.1.8"
@@ -38,11 +44,12 @@
     "lighthouse": "npx lhci autorun",
     "lint": "expo lint",
     "lint:fix": "eslint . --fix",
-    "ci": "npm run lint && npm run typecheck && npm test"
+    "ci": "npm run lint && npm run typecheck && npm run test:coverage"
   },
   "overrides": {
     "tmp": "^0.2.7",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "elliptic": "npm:empty-module@0.0.2"
   },
   "private": true
 }

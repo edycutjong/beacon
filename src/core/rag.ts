@@ -38,7 +38,7 @@ function tokenize(text: string): string[] {
 /** Pick the single sentence in a passage with the most query-term overlap. */
 function bestSnippet(text: string, queryTokens: string[]): string {
   const sentences = text.split(/(?<=\.)\s+/);
-  let best = sentences[0] ?? text;
+  let best = sentences[0];
   let bestHits = -1;
   for (const sentence of sentences) {
     const lower = sentence.toLowerCase();

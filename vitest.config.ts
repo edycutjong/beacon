@@ -2,7 +2,12 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["src/**/__tests__/**/*.test.ts"],
     globals: false,
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
+    server: {
+      deps: {
+        inline: ["react-native-nfc-manager", "expo-audio", "expo-file-system", "react-native"],
+      },
+    },
   },
 });

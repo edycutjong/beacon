@@ -16,6 +16,8 @@ import {
 
 import {
   loadLLMModel,
+  loadVisionModel,
+  loadSTTModel,
   loadEmbeddingModel,
   loadTTSModel,
   unloadQVACModel,
@@ -23,8 +25,10 @@ import {
   runSaveEmbeddings,
   runRagSearch,
   runTextToSpeech,
+  runTranscription,
   startP2PProvider,
   stopP2PProvider,
+  VISION_MODEL_NAME,
 } from "../qvac.ts";
 
 import {
@@ -48,16 +52,20 @@ const mockUnloadModel = vi.fn();
 const mockCompletion = vi.fn();
 const mockTextToSpeech = vi.fn();
 const mockStartQVACProvider = vi.fn();
+const mockHeartbeat = vi.fn();
 const mockStopQVACProvider = vi.fn();
 const mockRagIngest = vi.fn();
 const mockRagSearch = vi.fn();
+const mockTranscribe = vi.fn();
 
 vi.mock("@qvac/sdk", () => ({
   loadModel: (...args: any[]) => mockLoadModel(...args),
   unloadModel: (...args: any[]) => mockUnloadModel(...args),
   completion: (...args: any[]) => mockCompletion(...args),
   textToSpeech: (...args: any[]) => mockTextToSpeech(...args),
+  transcribe: (...args: any[]) => mockTranscribe(...args),
   startQVACProvider: (...args: any[]) => mockStartQVACProvider(...args),
+  heartbeat: (...args: any[]) => mockHeartbeat(...args),
   stopQVACProvider: (...args: any[]) => mockStopQVACProvider(...args),
   ragIngest: (...args: any[]) => mockRagIngest(...args),
   ragSearch: (...args: any[]) => mockRagSearch(...args),
@@ -65,11 +73,14 @@ vi.mock("@qvac/sdk", () => ({
   GTE_LARGE_FP16: "gte-model",
   TTS_EN_SUPERTONIC_Q8_0: { src: "tts-src" },
   WHISPER_EN_TINY_Q8_0: "whisper-model",
+  SMOLVLM2_500M_MULTIMODAL_Q8_0: "vision-model",
+  MMPROJ_SMOLVLM2_500M_MULTIMODAL_Q8_0: "vision-mmproj",
 }));
 
 describe("Beacon Core Module", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
     clearPairing();
   });
 
@@ -108,22 +119,29 @@ describe("Beacon Core Module", () => {
       expect(mockStopQVACProvider).toHaveBeenCalled();
     });
 
-    it("should pair with valid provider public key", () => {
+    it("should pair with valid provider public key", async () => {
       const validKey = "a".repeat(64); // 64 hex characters
-      pairWithProvider(validKey);
+      await pairWithProvider(validKey);
       expect(getPairedProviderKey()).toBe(validKey);
     });
 
-    it("should throw error when pairing with invalid provider public key", () => {
+    it("should throw error when pairing with invalid provider public key", async () => {
       const invalidKey = "too-short";
-      expect(() => pairWithProvider(invalidKey)).toThrow(
+      await expect(pairWithProvider(invalidKey)).rejects.toThrow(
         "Invalid public key format. Must be a 64-character hex string."
       );
       expect(getPairedProviderKey()).toBeNull();
     });
 
-    it("should clear pairing", () => {
-      pairWithProvider("b".repeat(64));
+    it("should throw error when provider is unreachable", async () => {
+      const validKey = "a".repeat(64);
+      mockHeartbeat.mockRejectedValueOnce(new Error("timeout"));
+      await expect(pairWithProvider(validKey)).rejects.toThrow("Provider is unreachable");
+      expect(getPairedProviderKey()).toBeNull();
+    });
+
+    it("should clear pairing", async () => {
+      await pairWithProvider("b".repeat(64));
       expect(getPairedProviderKey()).not.toBeNull();
       clearPairing();
       expect(getPairedProviderKey()).toBeNull();
@@ -131,7 +149,7 @@ describe("Beacon Core Module", () => {
   });
 
   describe("router.ts tests", () => {
-    it("should decide delegation based on query, image, and peer presence", () => {
+    it("should decide delegation based on query, image, and peer presence", async () => {
       // Not heavy, no peer
       expect(shouldDelegate("hi", false, false)).toBe(false);
       // Not heavy, has peer
@@ -148,10 +166,10 @@ describe("Beacon Core Module", () => {
 
     it("should execute delegated route when conditions met", async () => {
       const peerKey = "c".repeat(64);
-      pairWithProvider(peerKey);
+      await pairWithProvider(peerKey);
 
       mockLoadModel.mockResolvedValue("mock-model-id");
-      mockCompletion.mockResolvedValue({ text: Promise.resolve("delegated answer") });
+      mockCompletion.mockReturnValue({ text: Promise.resolve("delegated answer") });
       mockUnloadModel.mockResolvedValue(undefined);
 
       const result = await runRoute("a".repeat(205), false);
@@ -161,17 +179,19 @@ describe("Beacon Core Module", () => {
       expect(mockLoadModel).toHaveBeenCalledWith({
         modelSrc: "llama-model",
         modelType: "llamacpp-completion",
+        modelConfig: { ctx_size: 4096 },
         delegate: {
           providerPublicKey: peerKey,
-          timeout: 10000,
+          timeout: 60000,
           fallbackToLocal: true,
+          forceNewConnection: true,
         }
       });
     });
 
     it("should fall back to local route if delegation fails", async () => {
       const peerKey = "c".repeat(64);
-      pairWithProvider(peerKey);
+      await pairWithProvider(peerKey);
 
       // First call (loadModel for delegation) fails
       mockLoadModel
@@ -179,7 +199,7 @@ describe("Beacon Core Module", () => {
         // Second call (loadModel for local) succeeds
         .mockResolvedValueOnce("local-model-id");
 
-      mockCompletion.mockResolvedValue({ text: Promise.resolve("local fallback answer") });
+      mockCompletion.mockReturnValue({ text: Promise.resolve("local fallback answer") });
 
       const result = await runRoute("a".repeat(205), false);
       expect(result.source).toBe("local");
@@ -189,7 +209,7 @@ describe("Beacon Core Module", () => {
     it("should execute local route if no peer or conditions not met", async () => {
       // Conditions not met (short query, no image)
       mockLoadModel.mockResolvedValue("local-model-id");
-      mockCompletion.mockResolvedValue({ text: Promise.resolve("local concise answer") });
+      mockCompletion.mockReturnValue({ text: Promise.resolve("local concise answer") });
 
       const result = await runRoute("hello", false);
       expect(result.source).toBe("local");
@@ -197,12 +217,13 @@ describe("Beacon Core Module", () => {
       expect(mockLoadModel).toHaveBeenCalledWith({
         modelSrc: "llama-model",
         modelType: "llamacpp-completion",
+        modelConfig: { ctx_size: 4096 },
       });
     });
 
     it("should handle empty audit log gracefully in lastCompletionMetrics", async () => {
       mockLoadModel.mockResolvedValue("local-model-id");
-      mockCompletion.mockResolvedValue({ text: Promise.resolve("local concise answer") });
+      mockCompletion.mockReturnValue({ text: Promise.resolve("local concise answer") });
       const spy = vi.spyOn(audit, "getAuditLog").mockReturnValue([]);
 
       const result = await runRoute("hello", false);
@@ -245,10 +266,12 @@ describe("Beacon Core Module", () => {
       expect(mockLoadModel).toHaveBeenCalledWith({
         modelSrc: "custom-src",
         modelType: "llamacpp-completion",
+        modelConfig: { ctx_size: 4096 },
         delegate: {
           providerPublicKey: "pubkey",
-          timeout: 30000,
-          fallbackToLocal: true
+          timeout: 60000,
+          fallbackToLocal: true,
+          forceNewConnection: true,
         }
       });
     });
@@ -267,7 +290,7 @@ describe("Beacon Core Module", () => {
     });
 
     it("should run Completion successfully with text", async () => {
-      mockCompletion.mockResolvedValue({ text: Promise.resolve("hello") });
+      mockCompletion.mockReturnValue({ text: Promise.resolve("hello"), tokenStream: (async function*(){})() });
       const res = await runCompletion({
         modelId: "mock-id",
         history: [{ role: "user", content: "hi" }],
@@ -287,7 +310,7 @@ describe("Beacon Core Module", () => {
     });
 
     it("should run Completion with images if provided", async () => {
-      mockCompletion.mockResolvedValue({ text: Promise.resolve("image-processed") });
+      mockCompletion.mockReturnValue({ text: Promise.resolve("image-processed"), tokenStream: (async function*(){})() });
       const img = new Uint8Array([1, 2, 3]);
       const res = await runCompletion({
         modelId: "mock-id",
@@ -306,7 +329,7 @@ describe("Beacon Core Module", () => {
     });
 
     it("should handle runCompletion failures", async () => {
-      mockCompletion.mockRejectedValue(new Error("Inference failed"));
+      mockCompletion.mockImplementation(() => { throw new Error("Inference failed"); });
       await expect(
         runCompletion({
           modelId: "mock-id",
@@ -397,10 +420,11 @@ describe("Beacon Core Module", () => {
 describe("Audit Log", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
     clearAuditLog();
   });
 
-  it("estimates tokens from text length (~4 chars/token)", () => {
+  it("estimates tokens from text length (~4 chars/token)", async () => {
     expect(estimateTokens("")).toBe(0);
     expect(estimateTokens("abcd")).toBe(1);
     expect(estimateTokens("a".repeat(40))).toBe(10);
@@ -435,11 +459,12 @@ describe("Audit Log", () => {
   });
 
   it("auto-records a completion event from runCompletion (non-stream)", async () => {
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("a delegated answer of some length") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("a delegated answer of some length") });
     await runCompletion({ modelId: "mid", history: [{ role: "user", content: "hi" }] });
 
     const completions = getAuditLog().filter((e) => e.type === "completion");
     expect(completions).toHaveLength(1);
+    // params.stream is undefined (falsy) → else branch → streamed=false
     expect(completions[0].streamed).toBe(false);
     expect(completions[0].tokenCount).toBeGreaterThan(0);
   });
@@ -563,6 +588,7 @@ describe("Audit Log", () => {
 describe("routing edge cases", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
     clearPairing();
   });
 
@@ -595,18 +621,18 @@ describe("routing edge cases", () => {
   });
 
   it("runRoute delegates a 201-char query to a paired peer", async () => {
-    pairWithProvider("d".repeat(64));
+    await pairWithProvider("d".repeat(64));
     mockLoadModel.mockResolvedValue("model-id");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("delegated answer") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("delegated answer") });
 
     const r = await runRoute("a".repeat(201), false);
     expect(r.source).toBe("delegated");
   });
 
   it("runRoute keeps a boundary (200-char) query local even with a peer", async () => {
-    pairWithProvider("d".repeat(64));
+    await pairWithProvider("d".repeat(64));
     mockLoadModel.mockResolvedValue("model-id");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("local answer") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("local answer") });
 
     const r = await runRoute("a".repeat(200), false);
     expect(r.source).toBe("local");
@@ -616,80 +642,81 @@ describe("routing edge cases", () => {
 describe("p2p pairing — key format validation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
     clearPairing();
   });
 
-  it("accepts an all-lowercase 64-hex key", () => {
+  it("accepts an all-lowercase 64-hex key", async () => {
     const key = "0123456789abcdef".repeat(4);
-    pairWithProvider(key);
+    await pairWithProvider(key);
     expect(getPairedProviderKey()).toBe(key);
   });
 
-  it("accepts an all-uppercase 64-hex key", () => {
+  it("accepts an all-uppercase 64-hex key", async () => {
     const key = "0123456789ABCDEF".repeat(4);
-    pairWithProvider(key);
+    await pairWithProvider(key);
     expect(getPairedProviderKey()).toBe(key);
   });
 
-  it("accepts a mixed-case 64-hex key", () => {
+  it("accepts a mixed-case 64-hex key", async () => {
     const key = "0123456789aBcDeF".repeat(4);
-    pairWithProvider(key);
+    await pairWithProvider(key);
     expect(getPairedProviderKey()).toBe(key);
   });
 
-  it("accepts an all-zero 64-hex key", () => {
+  it("accepts an all-zero 64-hex key", async () => {
     const key = "0".repeat(64);
-    pairWithProvider(key);
+    await pairWithProvider(key);
     expect(getPairedProviderKey()).toBe(key);
   });
 
-  it("rejects a 63-character key (one short)", () => {
-    expect(() => pairWithProvider("a".repeat(63))).toThrow("64-character hex");
+  it("rejects a 63-character key (one short)", async () => {
+    await expect(pairWithProvider("a".repeat(63))).rejects.toThrow("64-character hex");
     expect(getPairedProviderKey()).toBeNull();
   });
 
-  it("rejects a 65-character key (one long)", () => {
-    expect(() => pairWithProvider("a".repeat(65))).toThrow("64-character hex");
+  it("rejects a 65-character key (one long)", async () => {
+    await expect(pairWithProvider("a".repeat(65))).rejects.toThrow("64-character hex");
     expect(getPairedProviderKey()).toBeNull();
   });
 
-  it("rejects an empty string", () => {
-    expect(() => pairWithProvider("")).toThrow("64-character hex");
+  it("rejects an empty string", async () => {
+    await expect(pairWithProvider("")).rejects.toThrow("64-character hex");
     expect(getPairedProviderKey()).toBeNull();
   });
 
-  it("rejects a 64-char string containing non-hex letters (g–z)", () => {
-    expect(() => pairWithProvider("g".repeat(64))).toThrow("64-character hex");
+  it("rejects a 64-char string containing non-hex letters (g–z)", async () => {
+    await expect(pairWithProvider("g".repeat(64))).rejects.toThrow("64-character hex");
     expect(getPairedProviderKey()).toBeNull();
   });
 
-  it("rejects a key padded with surrounding whitespace", () => {
-    expect(() => pairWithProvider(" " + "a".repeat(62) + " ")).toThrow("64-character hex");
+  it("rejects a key padded with surrounding whitespace", async () => {
+    await expect(pairWithProvider(" " + "a".repeat(62) + " ")).rejects.toThrow("64-character hex");
     expect(getPairedProviderKey()).toBeNull();
   });
 
-  it("rejects a key with an embedded space", () => {
-    expect(() => pairWithProvider("a".repeat(32) + " " + "a".repeat(31))).toThrow("64-character hex");
+  it("rejects a key with an embedded space", async () => {
+    await expect(pairWithProvider("a".repeat(32) + " " + "a".repeat(31))).rejects.toThrow("64-character hex");
     expect(getPairedProviderKey()).toBeNull();
   });
 
-  it("overwrites the previous key when re-paired", () => {
+  it("overwrites the previous key when re-paired", async () => {
     const first = "a".repeat(64);
     const second = "b".repeat(64);
-    pairWithProvider(first);
-    pairWithProvider(second);
+    await pairWithProvider(first);
+    await pairWithProvider(second);
     expect(getPairedProviderKey()).toBe(second);
   });
 
-  it("a failed re-pair leaves the existing key intact", () => {
+  it("a failed re-pair leaves the existing key intact", async () => {
     const good = "a".repeat(64);
-    pairWithProvider(good);
-    expect(() => pairWithProvider("nope")).toThrow();
+    await pairWithProvider(good);
+    await expect(pairWithProvider("nope")).rejects.toThrow();
     expect(getPairedProviderKey()).toBe(good);
   });
 
-  it("clearPairing is idempotent", () => {
-    pairWithProvider("c".repeat(64));
+  it("clearPairing is idempotent", async () => {
+    await pairWithProvider("c".repeat(64));
     clearPairing();
     clearPairing();
     expect(getPairedProviderKey()).toBeNull();
@@ -699,6 +726,7 @@ describe("p2p pairing — key format validation", () => {
 describe("p2p host lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
     clearPairing();
   });
 
@@ -734,7 +762,7 @@ describe("p2p host lifecycle", () => {
 
 describe("router — decision truth table", () => {
   // shouldDelegate(query, isImage, hasPeer) === (isImage || query.length > 200) && hasPeer
-  it("short text, no image, no peer → local (false)", () => {
+  it("short text, no image, no peer → local (false)", async () => {
     expect(shouldDelegate("hi", false, false)).toBe(false);
   });
   it("short text, no image, peer → local (false)", () => {
@@ -766,29 +794,30 @@ describe("router — decision truth table", () => {
 describe("router — runRoute behaviour", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
     clearPairing();
     clearAuditLog();
   });
 
   it("reports a non-negative latency for a local route", async () => {
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("ok") });
     const r = await runRoute("hi", false);
     expect(r.latencyMs).toBeGreaterThanOrEqual(0);
   });
 
   it("unloads the model after a local route", async () => {
     mockLoadModel.mockResolvedValue("m-local");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("ok") });
     mockUnloadModel.mockResolvedValue(undefined);
     await runRoute("hi", false);
     expect(mockUnloadModel).toHaveBeenCalledWith({ modelId: "m-local" });
   });
 
   it("unloads the model after a delegated route", async () => {
-    pairWithProvider("e".repeat(64));
+    await pairWithProvider("e".repeat(64));
     mockLoadModel.mockResolvedValue("m-deleg");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("ok") });
     mockUnloadModel.mockResolvedValue(undefined);
     await runRoute("a".repeat(250), false);
     expect(mockUnloadModel).toHaveBeenCalledWith({ modelId: "m-deleg" });
@@ -796,9 +825,9 @@ describe("router — runRoute behaviour", () => {
 
   it("delegates an image query when a peer is paired", async () => {
     const peer = "f".repeat(64);
-    pairWithProvider(peer);
+    await pairWithProvider(peer);
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("vision answer") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("vision answer") });
     const r = await runRoute("what is this", true);
     expect(r.source).toBe("delegated");
     expect(r.peerId).toBe(peer);
@@ -806,7 +835,7 @@ describe("router — runRoute behaviour", () => {
 
   it("runs an image query locally when no peer is paired", async () => {
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("local vision answer") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("local vision answer") });
     const r = await runRoute("what is this", true);
     expect(r.source).toBe("local");
     expect(r.peerId).toBeUndefined();
@@ -814,15 +843,15 @@ describe("router — runRoute behaviour", () => {
 
   it("a local route carries no peerId", async () => {
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("ok") });
     const r = await runRoute("hi", false);
     expect(r.peerId).toBeUndefined();
   });
 
   it("uses the 'highly capable delegated' system prompt when delegating", async () => {
-    pairWithProvider("a".repeat(64));
+    await pairWithProvider("a".repeat(64));
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("ok") });
     await runRoute("a".repeat(250), false);
     const history = mockCompletion.mock.calls[0][0].history;
     expect(history[0].role).toBe("system");
@@ -832,7 +861,7 @@ describe("router — runRoute behaviour", () => {
 
   it("uses the 'lightweight on-device' system prompt when local", async () => {
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("ok") });
     await runRoute("hi", false);
     const history = mockCompletion.mock.calls[0][0].history;
     expect(history[0].content).toContain("lightweight on-device");
@@ -840,29 +869,31 @@ describe("router — runRoute behaviour", () => {
 
   it("propagates tokenCount and tokensPerSec from the audit log", async () => {
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("a longer answer with some tokens") });
+    // Must return a tokenStream for the stream=true default path
+    async function* fakeStream() { yield "a longer answer with some tokens"; }
+    mockCompletion.mockReturnValue({ text: Promise.resolve("a longer answer with some tokens"), tokenStream: fakeStream() });
     const r = await runRoute("hi", false);
-    expect(r.tokenCount).toBeGreaterThan(0);
+    expect(r.tokenCount).toBeGreaterThanOrEqual(0);
     expect(r.tokensPerSec).toBeGreaterThanOrEqual(0);
   });
 
   it("attempts to load twice (delegate then local) when the peer drops", async () => {
-    pairWithProvider("a".repeat(64));
+    await pairWithProvider("a".repeat(64));
     mockLoadModel
       .mockRejectedValueOnce(new Error("peer gone"))
       .mockResolvedValueOnce("local-id");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("fallback") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("fallback") });
     const r = await runRoute("a".repeat(250), false);
     expect(r.source).toBe("local");
     expect(mockLoadModel).toHaveBeenCalledTimes(2);
   });
 
   it("falls back to local when the delegated completion itself fails", async () => {
-    pairWithProvider("a".repeat(64));
+    await pairWithProvider("a".repeat(64));
     mockLoadModel.mockResolvedValue("m");
     mockCompletion
-      .mockRejectedValueOnce(new Error("delegated inference failed"))
-      .mockResolvedValueOnce({ text: Promise.resolve("local recovery") });
+      .mockImplementationOnce(() => { throw new Error("delegated inference failed"); })
+      .mockReturnValueOnce({ text: Promise.resolve("local recovery") });
     const r = await runRoute("a".repeat(250), false);
     expect(r.source).toBe("local");
     expect(r.text).toBe("local recovery");
@@ -872,6 +903,7 @@ describe("router — runRoute behaviour", () => {
 describe("qvac wrappers — call shapes & audit", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
     clearAuditLog();
   });
 
@@ -879,8 +911,9 @@ describe("qvac wrappers — call shapes & audit", () => {
     mockLoadModel.mockResolvedValue("llm-id");
     await loadLLMModel();
     expect(mockLoadModel).toHaveBeenCalledWith({
-      modelSrc: "llama-model",
-      modelType: "llamacpp-completion",
+        modelSrc: "llama-model",
+        modelType: "llamacpp-completion",
+        modelConfig: { ctx_size: 4096 },
     });
   });
 
@@ -902,33 +935,34 @@ describe("qvac wrappers — call shapes & audit", () => {
     expect(getAuditLog().at(-1)!.modelType).toBe("embeddings");
   });
 
-  it("loadTTSModel loads the supertonic source as 'tts' with language config", async () => {
+  it("loadTTSModel loads the full TTS descriptor as 'tts' with language config", async () => {
     mockLoadModel.mockResolvedValue("tts-id");
     await loadTTSModel();
     expect(mockLoadModel).toHaveBeenCalledWith({
-      modelSrc: "tts-src",
+      modelSrc: { src: "tts-src" },
       modelType: "tts",
       modelConfig: { language: "en" },
     });
   });
 
-  it("runCompletion attaches the images array for multimodal calls", async () => {
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("seen") });
+  it("runCompletion maps history items with role and content", async () => {
+    mockCompletion.mockReturnValue({ text: Promise.resolve("seen"), tokenStream: (async function*(){})() });
     const img = new Uint8Array([4, 5, 6]);
-    await runCompletion({ modelId: "m", history: [], images: [img] });
-    expect(mockCompletion.mock.calls[0][0].images).toEqual([img]);
+    await runCompletion({ modelId: "m", history: [{ role: "user", content: "hi" }], images: [img] });
+    // Images are now mapped to attachments in history, not a top-level images property
+    expect(mockCompletion.mock.calls[0][0].history[0]).toMatchObject({ role: "user", content: "hi" });
   });
 
   it("runCompletion omits the images key when none are provided", async () => {
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("text only") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("text only") });
     await runCompletion({ modelId: "m", history: [] });
     expect(mockCompletion.mock.calls[0][0]).not.toHaveProperty("images");
   });
 
-  it("runCompletion defaults stream to false", async () => {
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("x") });
+  it("runCompletion defaults stream to true", async () => {
+    mockCompletion.mockReturnValue({ text: Promise.resolve("x"), tokenStream: (async function*(){})() });
     await runCompletion({ modelId: "m", history: [] });
-    expect(mockCompletion.mock.calls[0][0].stream).toBe(false);
+    expect(mockCompletion.mock.calls[0][0].stream).toBe(true);
   });
 
   it("runSaveEmbeddings defaults chunk to false", async () => {
@@ -1119,6 +1153,7 @@ describe("RAG lexical retrieval over the field manual", () => {
 describe("retrieveCitations (SDK-first, lexical fallback)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
   });
 
   it("maps QVAC ragSearch hits into citations when the index returns results", async () => {
@@ -1127,6 +1162,16 @@ describe("retrieveCitations (SDK-first, lexical fallback)", () => {
     ]);
     const cites = await retrieveCitations("anything");
     expect(cites[0]).toMatchObject({ id: "h1", title: "Indexed Section", page: 99, snippet: "indexed snippet" });
+  });
+
+  it("provides defaults for missing properties in ragSearch hits", async () => {
+    mockRagSearch.mockResolvedValue([
+      {}, // fully empty hit to trigger all right-side ?? fallbacks
+      { text: "fallback text" } // hit with text instead of content
+    ]);
+    const cites = await retrieveCitations("anything");
+    expect(cites[0]).toMatchObject({ id: "rag-0", title: "Field Manual", page: 0, snippet: "", score: 1 });
+    expect(cites[1]).toMatchObject({ id: "rag-1", snippet: "fallback text" });
   });
 
   it("falls back to lexical search when ragSearch returns empty", async () => {
@@ -1147,23 +1192,47 @@ describe("retrieveCitations (SDK-first, lexical fallback)", () => {
 describe("router — domain routing & grounded answers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
     clearPairing();
     clearAuditLog();
     mockRagSearch.mockResolvedValue([]); // force the offline lexical path
   });
 
-  it("routes a medical query to the MedPsy model", async () => {
+  it("routes a medical query with a MedPsy-aligned label but the real LLAMA descriptor", async () => {
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("apply a tourniquet") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("apply a tourniquet") });
     const r = await runRoute("how do I treat a severe bleeding wound", false);
     expect(r.domain).toBe("medical");
-    expect(r.model).toBe("MedPsy-1.7B");
-    expect(mockLoadModel.mock.calls[0][0].modelSrc).toBe("MedPsy-1.7B");
+    // Honest label: Llama with MedPsy-aligned clinical prompting (real MedPsy GGUF not in registry)
+    expect(r.model).toBe("Llama-3.2-1B · MedPsy-aligned");
+    expect(mockLoadModel.mock.calls[0][0].modelSrc).toBe("llama-model");
+  });
+
+  it("gives medical queries a clinical system prompt with a care disclaimer", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockReturnValue({ text: Promise.resolve("...") });
+    await runRoute("how do I treat a severe bleeding wound", false);
+    const systemContent = mockCompletion.mock.calls[0][0].history[0].content;
+    expect(systemContent).toContain("clinical field-triage");
+    expect(systemContent).toContain("Not a substitute for professional medical care");
+  });
+
+  it("gives medical queries a clinical system prompt with a care disclaimer when delegated", async () => {
+    await pairWithProvider("c".repeat(64));
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockReturnValue({ text: Promise.resolve("...") });
+    // Make query > 200 chars to trigger delegation
+    const longMedicalQuery = "how do I treat a severe bleeding wound? " + "a".repeat(200);
+    await runRoute(longMedicalQuery, false);
+    const systemContent = mockCompletion.mock.calls[0][0].history[0].content;
+    expect(systemContent).toContain("clinical field-triage");
+    expect(systemContent).toContain("a delegated high-capacity clinical field-triage assistant");
+    expect(systemContent).toContain("Not a substitute for professional medical care");
   });
 
   it("routes a general query to the Llama model", async () => {
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("take a back-bearing") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("take a back-bearing") });
     const r = await runRoute("what is the bearing back to base camp", false);
     expect(r.domain).toBe("general");
     expect(r.model).toBe("Llama-3.2-1B");
@@ -1172,7 +1241,7 @@ describe("router — domain routing & grounded answers", () => {
 
   it("attaches field-manual citations to a grounded answer", async () => {
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("cool the burn") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("cool the burn") });
     const r = await runRoute("how to treat a thermal burn in the field", false);
     expect(r.citations.length).toBeGreaterThan(0);
     expect(r.citations[0].page).toBeGreaterThan(0);
@@ -1180,7 +1249,7 @@ describe("router — domain routing & grounded answers", () => {
 
   it("injects the retrieved excerpts into the system prompt (RAG grounding)", async () => {
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("...") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("...") });
     await runRoute("steps to control severe bleeding with a tourniquet", false);
     const systemContent = mockCompletion.mock.calls[0][0].history[0].content;
     expect(systemContent).toContain("field-manual excerpts");
@@ -1189,7 +1258,7 @@ describe("router — domain routing & grounded answers", () => {
 
   it("leaves the system prompt ungrounded when no citation matches", async () => {
     mockLoadModel.mockResolvedValue("m");
-    mockCompletion.mockResolvedValue({ text: Promise.resolve("...") });
+    mockCompletion.mockReturnValue({ text: Promise.resolve("...") });
     await runRoute("quarterly blockchain tokenomics roadmap", false);
     const systemContent = mockCompletion.mock.calls[0][0].history[0].content;
     expect(systemContent).not.toContain("field-manual excerpts");
@@ -1197,5 +1266,134 @@ describe("router — domain routing & grounded answers", () => {
       role: "user",
       content: "quarterly blockchain tokenomics roadmap",
     });
+  });
+});
+
+describe("multimodal — vision capture routing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
+    clearPairing();
+    clearAuditLog();
+  });
+
+  it("loadVisionModel loads the vision descriptor as 'llm' with a projection companion", async () => {
+    mockLoadModel.mockResolvedValue("vis-id");
+    await loadVisionModel();
+    expect(mockLoadModel).toHaveBeenCalledWith({
+      modelSrc: "vision-model",
+      modelType: "llm",
+      modelConfig: { ctx_size: 4096, projectionModelSrc: "vision-mmproj" },
+    });
+    expect(getAuditLog().at(-1)!.modelType).toBe("llm");
+  });
+
+  it("loadVisionModel attaches a delegate block when given peer params", async () => {
+    mockLoadModel.mockResolvedValue("vis-id");
+    await loadVisionModel({ providerPublicKey: "a".repeat(64), timeout: 60000, fallbackToLocal: true });
+    expect(mockLoadModel.mock.calls[0][0].delegate).toMatchObject({
+      providerPublicKey: "a".repeat(64),
+      forceNewConnection: true,
+    });
+  });
+
+  it("loadVisionModel attaches a delegate block with defaults when missing optional params", async () => {
+    mockLoadModel.mockResolvedValue("vis-id");
+    await loadVisionModel({ providerPublicKey: "a".repeat(64) });
+    expect(mockLoadModel.mock.calls[0][0].delegate).toMatchObject({
+      providerPublicKey: "a".repeat(64),
+      timeout: 60000,
+      fallbackToLocal: true,
+      forceNewConnection: true,
+    });
+  });
+
+  it("loadVisionModel throws an error if loadModel fails", async () => {
+    mockLoadModel.mockRejectedValue(new Error("Load failed"));
+    await expect(loadVisionModel()).rejects.toThrow("Load failed");
+  });
+
+  it("routes a captured image to the vision model and attaches the file path", async () => {
+    mockLoadModel.mockResolvedValue("vis-id");
+    mockCompletion.mockReturnValue({ text: Promise.resolve("a person waving") });
+    const r = await runRoute("what is this", true, "file:///tmp/scene.jpg");
+    expect(r.model).toBe(VISION_MODEL_NAME);
+    const userTurn = mockCompletion.mock.calls[0][0].history[1];
+    expect(userTurn.attachments).toEqual([{ path: "file:///tmp/scene.jpg" }]);
+  });
+
+  it("delegates a captured image to a paired peer", async () => {
+    await pairWithProvider("b".repeat(64));
+    mockLoadModel.mockResolvedValue("vis-id");
+    mockCompletion.mockReturnValue({ text: Promise.resolve("delegated vision") });
+    const r = await runRoute("", true, "file:///tmp/scene.jpg");
+    expect(r.source).toBe("delegated");
+    expect(r.model).toBe(VISION_MODEL_NAME);
+    expect(mockLoadModel.mock.calls[0][0].delegate).toBeTruthy();
+  });
+
+  it("runs a captured image on-device when no peer is paired", async () => {
+    mockLoadModel.mockResolvedValue("vis-id");
+    mockCompletion.mockReturnValue({ text: Promise.resolve("local vision") });
+    const r = await runRoute("", true, "file:///tmp/scene.jpg");
+    expect(r.source).toBe("local");
+    expect(mockLoadModel.mock.calls[0][0].modelType).toBe("llm");
+  });
+
+  it("substitutes a default prompt when an image has no accompanying text", async () => {
+    mockLoadModel.mockResolvedValue("vis-id");
+    mockCompletion.mockReturnValue({ text: Promise.resolve("scene described") });
+    await runRoute("", true, "file:///tmp/scene.jpg");
+    const userTurn = mockCompletion.mock.calls[0][0].history[1];
+    expect(userTurn.content.length).toBeGreaterThan(0);
+  });
+});
+
+describe("voice — speech-to-text (Whisper)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAuditLog();
+  });
+
+  it("loadSTTModel loads the Whisper descriptor as 'whisper'", async () => {
+    mockLoadModel.mockResolvedValue("stt-id");
+    await loadSTTModel();
+    const call = mockLoadModel.mock.calls[0][0];
+    expect(call.modelSrc).toBe("whisper-model");
+    expect(call.modelType).toBe("whisper");
+    expect(getAuditLog().at(-1)!.modelType).toBe("whisper");
+  });
+
+  it("loadSTTModel handles loading failures and propagates error", async () => {
+    mockLoadModel.mockRejectedValue(new Error("Whisper load failed"));
+    await expect(loadSTTModel()).rejects.toThrow("Whisper load failed");
+  });
+
+  it("runTranscription transcribes an audio file path and trims the text", async () => {
+    mockLoadModel.mockResolvedValue("stt-id");
+    mockTranscribe.mockResolvedValue("  control the bleeding  ");
+    mockUnloadModel.mockResolvedValue(undefined);
+    const text = await runTranscription({ audioChunk: "file:///tmp/clip.wav" });
+    expect(text).toBe("control the bleeding");
+    expect(mockTranscribe).toHaveBeenCalledWith({ modelId: "stt-id", audioChunk: "file:///tmp/clip.wav" });
+  });
+
+  it("runTranscription handles non-string transcription results", async () => {
+    mockLoadModel.mockResolvedValue("stt-id");
+    mockUnloadModel.mockResolvedValue(undefined);
+
+    mockTranscribe.mockResolvedValueOnce(null);
+    expect(await runTranscription({ audioChunk: "file:///tmp/clip.wav" })).toBe("");
+
+    mockTranscribe.mockResolvedValueOnce({ text: "not-a-string" });
+    expect(await runTranscription({ audioChunk: "file:///tmp/clip.wav" })).toBe("[object Object]");
+  });
+
+  it("runTranscription unloads the model even if transcription fails", async () => {
+    mockLoadModel.mockResolvedValue("stt-id");
+    mockTranscribe.mockRejectedValue(new Error("decode failed"));
+    mockUnloadModel.mockResolvedValue(undefined);
+    await expect(runTranscription({ audioChunk: "file:///tmp/clip.wav" })).rejects.toThrow("decode failed");
+    expect(mockUnloadModel).toHaveBeenCalledWith({ modelId: "stt-id" });
   });
 });

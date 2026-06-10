@@ -5,13 +5,13 @@
 1. **The idea** — [Problem & Solution](#-the-problem--solution) · [Why ONLY QVAC](#-why-only-qvac): on-device small model + transparent P2P **delegate** to a laptop peer, with automatic on-device **fallback**.
 2. **Run it** (Expo app + laptop provider):
    ```bash
-   npm install && python3 scripts/seed.py
-   npm run provider              # laptop-side provider (hosts the large model)
-   npx expo start                # phone app — Expo Go / simulator
+   make setup                    # install packages and seed the manual
+   make provider                 # laptop-side provider (hosts the large model)
+   make start                    # phone app — Expo Go / simulator
    ```
-   Pair phone → laptop, send a heavy query → topology shows **DELEGATED → laptop**; stop the provider → it **auto-falls back** to the on-device model (badge flips to LOCAL).
-3. **Verify offline:** `python3 scripts/verify_offline.py` (unplug Wi-Fi first) — scans for banned cloud-SDK imports + asserts network isolation.
-4. **Tests & metrics:** `npm run ci` — typecheck + **100+ unit tests** (routing decisions, Ed25519 pairing, fallback, on-device audit log). `python3 scripts/bench.py` — local-vs-delegated latency + fallback-switch budgets.
+   Pair phone → laptop (scan QR · tap NFC · or paste key), send a heavy query (or a field photo) → topology shows **DELEGATED → laptop**; stop the provider → it **auto-falls back** to the on-device model (badge flips to LOCAL).
+3. **Verify offline:** `make verify` (unplug Wi-Fi first) — scans for banned cloud-SDK imports + asserts network isolation.
+4. **Tests & metrics:** `make ci` — typecheck + **150+ unit tests** (routing decisions, multimodal vision routing, Ed25519 pairing, QR/NFC/deeplink key parsing, fallback, on-device audit log). `make bench` — local-vs-delegated latency + fallback-switch budgets.
 5. **No remote APIs** ([docs/REMOTE_APIS.md](docs/REMOTE_APIS.md)) — all inference is local via `@qvac/sdk`; the P2P link stays on local Wi-Fi and never touches the internet.
 
 > ℹ️ This is a prototype: the provider daemon and on-device models run in a demo/simulated mode (see [Honest Limitations](#️-honest-limitations)). The routing/fallback logic and the offline guarantee are real and unit-tested.
@@ -51,10 +51,13 @@ In field conditions — disaster zones, remote construction sites, wilderness �
 **Key Features:**
 - 📡 **P2P Delegation** — Heavy queries offloaded to laptop via Wi-Fi Direct
 - 🔄 **Auto Fallback** — If peer drops, routes to on-device small model instantly
+- 📷 **Multimodal Field Capture** — Snap a photo; the heavy vision pass (`SmolVLM2-500M`) delegates to the peer, falling back on-device
+- 📲 **Tap / Scan / Link Pairing** — Pair by scanning a provider QR, tapping an NFC tag, or opening a `beacon://pair?key=…` deeplink
 - 🩺 **MedPsy Domain Routing** — Medical queries route to QVAC's specialized `MedPsy-1.7B` model
 - 📑 **Offline RAG Citations** — Answers are grounded in a bundled field manual via local `ragSearch`
+- 📝 **Markdown Answers** — Model output renders with headings, lists, code blocks and citations
 - 🔐 **Ed25519 Pairing** — Secure peer authentication without cloud PKI
-- 📊 **Topology Indicator** — Shows "LOCAL" vs "DELEGATED → Laptop-01"
+- 📊 **Topology Indicator** — Shows "LOCAL" vs "DELEGATED → Laptop-01", with a P2P host status (INACTIVE → SYNCING → ACTIVE)
 - 🔇 **100% Offline** — No internet required, ever
 
 ## 🏗️ Architecture & Tech Stack
@@ -86,8 +89,9 @@ graph TD
 | Layer | Technology |
 |---|---|
 | **Mobile App** | Expo 56, React Native 0.85, React 19 |
-| **AI Engine** | @qvac/sdk (completion, RAG, TTS, P2P) |
-| **Models** | Llama-3.2-1B (general), MedPsy-1.7B (medical triage) |
+| **AI Engine** | @qvac/sdk (completion, RAG, TTS, vision, P2P) |
+| **Models** | Llama-3.2-1B (general), MedPsy-1.7B (medical triage), SmolVLM2-500M (vision) |
+| **Pairing** | QR (expo-camera) · NFC (react-native-nfc-manager) · `beacon://` deeplink (expo-linking) |
 | **Provider** | Node.js daemon (laptop-side) |
 
 ## 🏆 Why ONLY QVAC?
@@ -142,7 +146,7 @@ Run `python3 scripts/bench.py` to reproduce. Results on iPhone 15 + MacBook Pro 
 
 ## 🧪 Testing & CI
 
-**100+ unit tests (Vitest)** covering the local-vs-delegate router, Ed25519 P2P pairing, the auto-fallback path, and the on-device audit log (model loads/unloads · TTFT · tokens/sec), plus **3 E2E suites (Playwright)** and the offline-verification checks.
+**150+ unit tests (Vitest)** covering the local-vs-delegate router, multimodal vision routing, Ed25519 P2P pairing, QR/NFC/deeplink key parsing, the auto-fallback path, and the on-device audit log (model loads/unloads · TTFT · tokens/sec), plus **3 E2E suites (Playwright)** and the offline-verification checks.
 
 ## 🔍 Verification & Compliance
 
@@ -150,7 +154,7 @@ Run `python3 scripts/bench.py` to reproduce. Results on iPhone 15 + MacBook Pro 
 |---|---|---|
 | **No remote APIs** — zero cloud | [`docs/REMOTE_APIS.md`](docs/REMOTE_APIS.md) | `python3 scripts/verify_offline.py` scans for cloud SDKs |
 | **Offline proof** — 0 outbound | `scripts/verify_offline.py` | unplug Wi-Fi, then run |
-| **Tests** | `npm run ci` · `npx playwright test` | 100+ unit + 3 E2E |
+| **Tests** | `npm run ci` · `npx playwright test` | 150+ unit + 3 E2E |
 | **Benchmarks** | `scripts/bench.py` | ⚠️ simulated — re-run on phone+laptop for real numbers |
 | **Audit log** (model loads/unloads · TTFT/tokens/sec) | `src/core/audit.ts` | ✅ auto-captured on every inference; shown in-app + `getAuditSummary()` |
 
@@ -185,15 +189,23 @@ beacon/
 ├── scripts/            # seed, bench, verify, readiness
 ├── src/
 │   ├── core/
-│   │   ├── domain.ts   # Medical-query classifier
-│   │   ├── manual.ts   # Bundled offline field manual (RAG corpus)
-│   │   ├── rag.ts      # ragSearch + lexical fallback
-│   │   ├── qvac.ts     # @qvac/sdk wrapper
-│   │   ├── p2p.ts      # P2P host/pair lifecycle
-│   │   └── router.ts   # Local vs delegate routing
+│   │   ├── domain.ts      # Medical-query classifier
+│   │   ├── manual.ts      # Bundled offline field manual (RAG corpus)
+│   │   ├── rag.ts         # ragSearch + lexical fallback
+│   │   ├── qvac.ts        # @qvac/sdk wrapper (completion, vision, RAG, TTS, P2P)
+│   │   ├── p2p.ts         # P2P host/pair lifecycle
+│   │   ├── pairingLink.ts # QR/NFC/deeplink key parsing
+│   │   ├── nfc.ts         # NFC tap-to-pair reader (platform-guarded)
+│   │   ├── audit.ts       # On-device audit log (loads/unloads · TTFT · tok/s)
+│   │   └── router.ts      # Local vs delegate routing (text + vision)
+│   ├── components/
+│   │   ├── QRScanner.tsx     # Camera QR pairing
+│   │   ├── NfcPairModal.tsx  # NFC tap-to-pair
+│   │   ├── CameraCapture.tsx # Multimodal field-photo capture
+│   │   └── Markdown.tsx      # Dependency-free markdown renderer
 │   └── node/
 │       └── provider.ts # Laptop-side daemon
-├── App.tsx             # Expo UI (pairing + query)
+├── App.tsx             # Expo UI (pairing · query · multimodal · markdown)
 ├── .github/            # CI/CD + CodeQL + Dependabot
 └── README.md
 ```
@@ -201,9 +213,9 @@ beacon/
 ## ⚠️ Honest Limitations
 
 1. P2P pairing requires same local network
-2. No QR pairing flow (manual key exchange)
-3. Limited to text queries in current UI
-4. Provider daemon is a stub
+2. NFC tap-to-pair and camera/vision need a physical device (no simulator); iOS NFC requires a paid Apple Developer account to sign the entitlement
+3. Provider daemon and on-device models run in a demo/simulated mode — the routing, fallback, pairing and offline guarantees are real and unit-tested
+4. Benchmark timings are simulated until re-run on real phone + laptop hardware
 
 ## 📄 License
 [MIT](LICENSE) © 2026 Edy Cu

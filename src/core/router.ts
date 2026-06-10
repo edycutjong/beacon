@@ -1,4 +1,4 @@
-import { loadLLMModel, runCompletion, unloadQVACModel, LLAMA_MODEL_ID, MEDPSY_MODEL_ID } from "./qvac.ts";
+import { loadLLMModel, loadVisionModel, runCompletion, unloadQVACModel, LLAMA_MODEL_ID, VISION_MODEL_NAME, type CompletionMessage } from "./qvac.ts";
 import { getPairedProviderKey } from "./p2p.ts";
 import { getAuditLog } from "./audit.ts";
 import { classifyDomain, type Domain } from "./domain.ts";
@@ -21,11 +21,33 @@ export interface RouteResult {
   citations: Citation[];
 }
 
-/** Friendly model names for the HUD, keyed by domain. */
+/**
+ * Friendly model names for the HUD, keyed by domain.
+ * NOTE: MedPsy-1.7B (Tether's clinical model) is not yet published in the QVAC
+ * SDK model registry, so medical queries run on Llama-3.2-1B with a dedicated
+ * MedPsy-aligned clinical prompt. The label reflects that honestly — swap to the
+ * real MedPsy descriptor the moment it lands in the registry.
+ */
 const MODEL_NAME: Record<Domain, string> = {
-  medical: "MedPsy-1.7B",
+  medical: "Llama-3.2-1B · MedPsy-aligned",
   general: "Llama-3.2-1B",
 };
+
+/** Domain- and location-aware system prompt. Medical queries get clinical guardrails. */
+function systemPromptFor(hasImage: boolean, delegated: boolean, domain: Domain): string {
+  if (hasImage) {
+    return delegated
+      ? "You are a delegated multimodal field-vision model. Describe what is visible and give the operator clear, actionable guidance."
+      : "You are an on-device multimodal field-vision model. Concisely describe the image and give actionable guidance.";
+  }
+  if (domain === "medical") {
+    const compute = delegated ? "a delegated high-capacity" : "a lightweight on-device";
+    return `You are ${compute} clinical field-triage assistant (MedPsy-aligned). Give calm, numbered first-aid steps, call out red-flag symptoms that require evacuation, and never invent drug dosages. End with: "Not a substitute for professional medical care."`;
+  }
+  return delegated
+    ? "You are a highly capable delegated AI compute provider. Answer the query thoroughly."
+    : "You are a lightweight on-device AI. Provide a concise response.";
+}
 
 /** Pull the metrics recorded by runCompletion for the call that just finished. */
 function lastCompletionMetrics(): { tokenCount?: number; tokensPerSec?: number } {
@@ -53,37 +75,53 @@ function ground(basePrompt: string, citations: Citation[]): string {
   return `${basePrompt}\n\nGround your answer in these field-manual excerpts and cite the page numbers:\n${excerpts}`;
 }
 
-export async function runRoute(query: string, isImage: boolean = false): Promise<RouteResult> {
+export async function runRoute(query: string, isImage: boolean = false, imagePath?: string): Promise<RouteResult> {
   const tStart = Date.now();
   const providerKey = getPairedProviderKey();
   const hasPeer = providerKey !== null;
+  // An image makes a query "heavy" whether it arrives as the boolean flag (tests)
+  // or as a captured file path (real multimodal capture).
+  const hasImage = isImage || imagePath != null;
 
-  // Specialized-model routing: medical/triage → MedPsy, everything else → Llama.
+  // Domain routing: medical queries get a MedPsy-aligned clinical prompt, all
+  // text runs on Llama-3.2-1B (the real MedPsy GGUF isn't in the QVAC registry
+  // yet — see MODEL_NAME). Image queries run on the vision model instead.
   const domain = classifyDomain(query);
-  const modelSrc = domain === "medical" ? MEDPSY_MODEL_ID : LLAMA_MODEL_ID;
-  const model = MODEL_NAME[domain];
+  const model = hasImage ? VISION_MODEL_NAME : MODEL_NAME[domain];
 
   // Offline RAG: ground the answer in the bundled field manual (runs locally,
   // independent of where inference executes).
   const citations = await retrieveCitations(query);
 
-  const useDelegation = shouldDelegate(query, isImage, hasPeer);
+  const useDelegation = shouldDelegate(query, hasImage, hasPeer);
+
+  // Build the user turn, attaching the captured image for multimodal completion.
+  const userTurn: CompletionMessage = imagePath
+    ? { role: "user", content: query || "Describe this scene and give a field operator clear, actionable guidance.", attachments: [{ path: imagePath }] }
+    : { role: "user", content: query };
+
+  const loadModelFor = (delegate?: { providerPublicKey: string; timeout: number; fallbackToLocal: boolean }) =>
+    hasImage
+      ? loadVisionModel(delegate)
+      : loadLLMModel(LLAMA_MODEL_ID, delegate);
 
   if (useDelegation && providerKey) {
     try {
-      console.log(`📤 Routing query to delegated peer: ${providerKey}`);
-      // Load model using the delegate key
-      const modelId = await loadLLMModel(modelSrc as any, {
+      console.log(`📤 Routing ${hasImage ? "vision " : ""}query to delegated peer: ${providerKey}`);
+      // Cold-DHT bootstrap can take 15-45s on first run per SDK docs
+      const modelId = await loadModelFor({
         providerPublicKey: providerKey,
-        timeout: 10000,
+        timeout: 60000,
         fallbackToLocal: true
       });
+
+      const systemPrompt = systemPromptFor(hasImage, true, domain);
 
       const response = await runCompletion({
         modelId,
         history: [
-          { role: "system", content: ground("You are a highly capable delegated AI compute provider. Answer the query thoroughly.", citations) },
-          { role: "user", content: query }
+          { role: "system", content: ground(systemPrompt, citations) },
+          userTurn
         ],
         stream: false
       });
@@ -108,14 +146,16 @@ export async function runRoute(query: string, isImage: boolean = false): Promise
   }
 
   // Local on-device execution fallback
-  console.log("💻 Running local on-device inference");
-  const modelId = await loadLLMModel(modelSrc as any);
+  console.log(`💻 Running local on-device ${hasImage ? "vision " : ""}inference`);
+  const modelId = await loadModelFor();
+
+  const systemPrompt = systemPromptFor(hasImage, false, domain);
 
   const response = await runCompletion({
     modelId,
     history: [
-      { role: "system", content: ground("You are a lightweight on-device AI. Provide a concise response.", citations) },
-      { role: "user", content: query }
+      { role: "system", content: ground(systemPrompt, citations) },
+      userTurn
     ],
     stream: false
   });

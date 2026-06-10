@@ -5,29 +5,45 @@ import {
   ragIngest,
   ragSearch,
   textToSpeech,
+  transcribe,
   startQVACProvider,
   stopQVACProvider,
+  heartbeat,
   LLAMA_3_2_1B_INST_Q4_0,
   GTE_LARGE_FP16,
   TTS_EN_SUPERTONIC_Q8_0,
+  WHISPER_EN_TINY_Q8_0,
+  SMOLVLM2_500M_MULTIMODAL_Q8_0,
+  MMPROJ_SMOLVLM2_500M_MULTIMODAL_Q8_0,
 } from "@qvac/sdk";
 import { recordModelLoad, recordModelUnload, recordCompletion, estimateTokens } from "./audit.ts";
 
 // Define custom constants or fallbacks
 export const MEDPSY_MODEL_ID = "MedPsy-1.7B"; // Default name for MedPsy-1.7B
-export const MULTIMODAL_MODEL_ID = "QVAC-Vision-1B"; // Multimodal vision model for scene understanding
+export const MULTIMODAL_MODEL_ID = "QVAC-Vision-1B"; // Legacy label, kept for back-compat
 export const LLAMA_MODEL_ID = LLAMA_3_2_1B_INST_Q4_0;
 export const EMBEDDING_MODEL_ID = GTE_LARGE_FP16;
+// Real multimodal (vision) descriptor + its projection companion. Loading a
+// vision model is heavy — exactly the workload Beacon delegates to a peer.
+export const VISION_MODEL_ID = SMOLVLM2_500M_MULTIMODAL_Q8_0;
+export const VISION_PROJECTION_ID = MMPROJ_SMOLVLM2_500M_MULTIMODAL_Q8_0;
+export const VISION_MODEL_NAME = "SmolVLM2-500M";
+// On-device speech-to-text (Whisper) for hands-free voice queries in the field.
+export const STT_MODEL_ID = WHISPER_EN_TINY_Q8_0;
+export const STT_MODEL_NAME = "Whisper-tiny.en";
 
 export interface CompletionMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  /** File-path image attachments for multimodal completion, e.g. [{ path: uri }]. */
+  attachments?: { path: string }[];
 }
 
 export interface CompletionParams {
   modelId: string;
   history: CompletionMessage[];
   stream?: boolean;
+  /** @deprecated Pass images as per-message `attachments: [{ path }]` instead. */
   images?: Uint8Array[];
 }
 
@@ -41,6 +57,11 @@ export interface RagSearchParams {
   modelId: string;
   query: string;
   topK?: number;
+}
+
+export interface TranscribeParams {
+  /** File path/URI to the recorded audio, or a raw audio Buffer. */
+  audioChunk: string | Uint8Array;
 }
 
 export interface TTSParams {
@@ -66,24 +87,29 @@ export interface P2PDelegateParams {
 
 export async function loadLLMModel(modelSrc: any = LLAMA_MODEL_ID, delegateParams?: P2PDelegateParams) {
   try {
-    const src = typeof modelSrc === "string" ? modelSrc : modelSrc.src;
+    // SDK expects modelSrc as the full descriptor constant (e.g. LLAMA_3_2_1B_INST_Q4_0),
+    // not the .src string. See: docs.qvac.tether.io/p2p-capabilities/delegated-inference
     const params: any = {
-      modelSrc: src,
+      modelSrc,
       modelType: "llamacpp-completion",
+      modelConfig: {
+        ctx_size: 4096,
+      },
     };
 
     if (delegateParams) {
-      // Confirm signature against docs.qvac.tether.io
+      // delegate is a top-level loadModel option per SDK docs
       params.delegate = {
         providerPublicKey: delegateParams.providerPublicKey,
-        timeout: delegateParams.timeout ?? 30000,
+        timeout: delegateParams.timeout ?? 60000,
         fallbackToLocal: delegateParams.fallbackToLocal ?? true,
+        forceNewConnection: true,
       };
     }
 
     const tLoad = Date.now();
     const modelId = await loadModel(params);
-    recordModelLoad(modelId, params.modelType, Date.now() - tLoad);
+    recordModelLoad(modelId, "llamacpp-completion", Date.now() - tLoad);
     return modelId;
   } catch (error) {
     console.error("Failed to load LLM model:", error);
@@ -91,12 +117,43 @@ export async function loadLLMModel(modelSrc: any = LLAMA_MODEL_ID, delegateParam
   }
 }
 
+export async function loadVisionModel(delegateParams?: P2PDelegateParams) {
+  try {
+    // Multimodal models load as "llm" with a projection companion (mmproj).
+    // See: node_modules/@qvac/sdk/dist/examples/llamacpp-multimodal.js
+    const params: any = {
+      modelSrc: VISION_MODEL_ID,
+      modelType: "llm",
+      modelConfig: {
+        ctx_size: 4096,
+        projectionModelSrc: VISION_PROJECTION_ID,
+      },
+    };
+
+    if (delegateParams) {
+      params.delegate = {
+        providerPublicKey: delegateParams.providerPublicKey,
+        timeout: delegateParams.timeout ?? 60000,
+        fallbackToLocal: delegateParams.fallbackToLocal ?? true,
+        forceNewConnection: true,
+      };
+    }
+
+    const tLoad = Date.now();
+    const modelId = await loadModel(params);
+    recordModelLoad(modelId, "llm", Date.now() - tLoad);
+    return modelId;
+  } catch (error) {
+    console.error("Failed to load vision model:", error);
+    throw error;
+  }
+}
+
 export async function loadEmbeddingModel(modelSrc: any = EMBEDDING_MODEL_ID) {
   try {
-    const src = typeof modelSrc === "string" ? modelSrc : modelSrc.src;
     const tLoad = Date.now();
     const modelId = await loadModel({
-      modelSrc: src,
+      modelSrc,
       modelType: "embeddings",
     } as any);
     recordModelLoad(modelId, "embeddings", Date.now() - tLoad);
@@ -111,7 +168,7 @@ export async function loadTTSModel(_eSpeakDataPath: string = "./espeak-data") {
   try {
     const tLoad = Date.now();
     const modelId = await loadModel({
-      modelSrc: TTS_EN_SUPERTONIC_Q8_0.src,
+      modelSrc: TTS_EN_SUPERTONIC_Q8_0,
       modelType: "tts",
       modelConfig: {
         language: "en",
@@ -122,6 +179,37 @@ export async function loadTTSModel(_eSpeakDataPath: string = "./espeak-data") {
   } catch (error) {
     console.error("Failed to load TTS model:", error);
     throw error;
+  }
+}
+
+export async function loadSTTModel(modelSrc: any = STT_MODEL_ID) {
+  try {
+    const tLoad = Date.now();
+    const modelId = await loadModel({
+      modelSrc,
+      modelType: "whisper",
+      modelConfig: {
+        audio_format: "f32le",
+        language: "en",
+        translate: false,
+      },
+    } as any);
+    recordModelLoad(modelId, "whisper", Date.now() - tLoad);
+    return modelId;
+  } catch (error) {
+    console.error("Failed to load STT model:", error);
+    throw error;
+  }
+}
+
+/** Transcribe recorded audio to text on-device (Whisper). Frees the model after. */
+export async function runTranscription(params: TranscribeParams): Promise<string> {
+  const modelId = await loadSTTModel();
+  try {
+    const text = await transcribe({ modelId, audioChunk: params.audioChunk as any });
+    return typeof text === "string" ? text.trim() : String(text ?? "").trim();
+  } finally {
+    await unloadQVACModel(modelId);
   }
 }
 
@@ -140,14 +228,14 @@ export async function runCompletion(params: CompletionParams): Promise<{ text: s
   try {
     const completionParams: any = {
       modelId: params.modelId,
-      history: params.history,
-      stream: params.stream ?? false,
+      history: params.history.map(m => ({
+        role: m.role,
+        content: m.content,
+        // Per-message file-path attachments drive multimodal (vision) completion.
+        ...(m.attachments && m.attachments.length > 0 ? { attachments: m.attachments } : {}),
+      })),
+      stream: params.stream ?? true,
     };
-
-    // Attach images for multimodal inference if provided
-    if (params.images && params.images.length > 0) {
-      completionParams.images = params.images;
-    }
 
     if (params.stream) {
       const result: any = completion({ ...completionParams, stream: true });
@@ -183,7 +271,9 @@ export async function runCompletion(params: CompletionParams): Promise<{ text: s
       return { text: "", tokenStream: stream };
     } else {
       const tStart = Date.now();
-      const result = await completion({ ...completionParams, stream: false });
+      // completion() always returns a CompletionRun synchronously;
+      // .text is a Promise<string> that resolves when the response ends.
+      const result = completion({ ...completionParams, stream: true });
       const text = await result.text;
       const totalMs = Date.now() - tStart;
       // Non-streamed: TTFT is unknown, so it's reported as the full-response
@@ -279,5 +369,14 @@ export async function stopP2PProvider() {
   } catch (error) {
     console.error("Failed to stop QVAC P2P Provider:", error);
     throw error;
+  }
+}
+
+export async function runHeartbeat(providerPublicKey: string): Promise<boolean> {
+  try {
+    const res = await heartbeat({ delegate: { providerPublicKey, timeout: 5000 } });
+    return res.type === "heartbeat";
+  } catch {
+    return false;
   }
 }

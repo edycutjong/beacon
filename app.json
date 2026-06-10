@@ -3,12 +3,16 @@
     "name": "Beacon",
     "slug": "dorahacks-qvec-beacon",
     "version": "1.0.0",
+    "scheme": "beacon",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.dorahacks-qvec-beacon"
+      "bundleIdentifier": "dev.edycu.beacon",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Beacon scans a provider's QR code to establish a secure P2P compute uplink."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,14 +21,35 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "dev.edycu.beacon"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "@qvac/sdk/expo-plugin",
-      "./withAndroidShrinkFix.js"
+      "./withAndroidShrinkFix.js",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Beacon scans a provider's QR code to establish a secure P2P compute uplink."
+        }
+      ],
+      [
+        "react-native-nfc-manager",
+        {
+          "nfcPermission": "Beacon reads a provider's NFC tag to establish a secure P2P compute uplink.",
+          "selectIdentifiers": [],
+          "includeNdefEntitlement": true
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Beacon records your voice on-device to transcribe field queries — audio never leaves the device."
+        }
+      ]
     ]
   }
 }

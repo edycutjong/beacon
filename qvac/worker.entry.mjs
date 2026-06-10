@@ -8,9 +8,9 @@
 *   - @qvac/sdk/whispercpp-transcription/plugin
 *   - @qvac/sdk/parakeet-transcription/plugin
 *   - @qvac/sdk/nmtcpp-translation/plugin
+*   - @qvac/sdk/tts-ggml/plugin
 *   - @qvac/sdk/onnx-ocr/plugin
 *   - @qvac/sdk/sdcpp-generation/plugin
-*   - @qvac/sdk/onnx-tts/plugin
  */
 
 import { initializeWorkerCore, ensureRPCSetup } from "@qvac/sdk/worker-core";
@@ -22,9 +22,9 @@ import { embeddingsPlugin } from "@qvac/sdk/llamacpp-embedding/plugin";
 import { whisperPlugin } from "@qvac/sdk/whispercpp-transcription/plugin";
 import { parakeetPlugin } from "@qvac/sdk/parakeet-transcription/plugin";
 import { nmtPlugin } from "@qvac/sdk/nmtcpp-translation/plugin";
+import { ttsPlugin } from "@qvac/sdk/tts-ggml/plugin";
 import { ocrPlugin } from "@qvac/sdk/onnx-ocr/plugin";
 import { diffusionPlugin } from "@qvac/sdk/sdcpp-generation/plugin";
-import { ttsPlugin as customPlugin0 } from "@qvac/sdk/onnx-tts/plugin";
 
 const { hasRPCConfig } = initializeWorkerCore();
 
@@ -37,9 +37,9 @@ registerPlugin(embeddingsPlugin);
 registerPlugin(whisperPlugin);
 registerPlugin(parakeetPlugin);
 registerPlugin(nmtPlugin);
+registerPlugin(ttsPlugin);
 registerPlugin(ocrPlugin);
 registerPlugin(diffusionPlugin);
-registerPlugin(customPlugin0);
 
 // Auto-setup RPC if config present
 if (hasRPCConfig) {
