@@ -2,8 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
   ScrollView, StatusBar, Alert, Animated, Easing
-} from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+, SafeAreaView } from 'react-native';
 import { runRoute, type RouteResult } from './src/core/router';
 import { pairWithProvider, getPairedProviderKey, clearPairing } from './src/core/p2p';
 
@@ -33,14 +32,14 @@ export default function App() {
   const [paired, setPaired] = useState<string | null>(getPairedProviderKey());
   
   // Animations
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(1));
+  const [fadeAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: false })
       ])
     ).start();
   }, [pulseAnim]);
@@ -48,7 +47,7 @@ export default function App() {
   useEffect(() => {
     if (result) {
       fadeAnim.setValue(0);
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: false }).start();
     }
   }, [result, fadeAnim]);
 
@@ -86,9 +85,8 @@ export default function App() {
   const modeLabel = delegateReady ? 'LINK ESTABLISHED' : 'LOCAL SANDBOX';
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={s.container}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+    <SafeAreaView style={s.container}>
+      <StatusBar barStyle="light-content" backgroundColor={C.bg} />
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
         
         {/* Header Dashboard */}
@@ -100,9 +98,9 @@ export default function App() {
               <Text style={s.subtitle}>P2P FIELD ASSISTANT_v1.0</Text>
             </View>
           </View>
-          <View style={[s.pill, { borderColor: `${C.green}50`, backgroundColor: `${C.green}15` }]}>
-            <View style={[s.dot, { backgroundColor: C.green }]} />
-            <Text style={[s.pillText, { color: C.green }]}>SYS: OFFLINE · QVAC</Text>
+          <View style={[s.pill, { borderColor: `${C.red}50`, backgroundColor: `${C.red}15` }]}>
+            <View style={[s.dot, { backgroundColor: C.red }]} />
+            <Text style={[s.pillText, { color: C.red }]}>SYS: OFFLINE · QVAC</Text>
           </View>
         </View>
 
@@ -188,16 +186,48 @@ export default function App() {
         {result && (
           <Animated.View style={[s.section, { opacity: fadeAnim }]}>
             <Text style={s.sectionTitle}>[ OUTPUT DATA ]</Text>
-            <View style={[s.resultCard, { borderColor: result.source === 'delegated' ? C.cyan : C.green }]}>
+            <View style={[s.resultCard, { borderColor: result.source === 'delegated' ? C.amber : C.green }]}>
               <View style={s.resultHeader}>
                 <View style={s.resultSourcePill}>
-                  <Text style={[s.resultMode, { color: result.source === 'delegated' ? C.cyan : C.green }]}>
+                  <Text style={[s.resultMode, { color: result.source === 'delegated' ? C.amber : C.green }]}>
                     SRC: {result.source === 'delegated' ? 'EXTERNAL' : 'INTERNAL'}
                   </Text>
                 </View>
                 <Text style={s.latency}>{result.latencyMs}ms</Text>
               </View>
+
+              {/* Model + domain chip — shows MedPsy routing for medical queries */}
+              <View style={s.modelRow}>
+                <View style={[s.modelChip, { borderColor: result.domain === 'medical' ? `${C.cyan}80` : '#334155' }]}>
+                  <Text style={[s.modelChipText, { color: result.domain === 'medical' ? C.cyan : C.text2 }]}>
+                    ⬡ {result.model}
+                  </Text>
+                </View>
+                {result.domain === 'medical' && (
+                  <View style={[s.modelChip, { borderColor: `${C.cyan}80`, backgroundColor: `${C.cyan}10` }]}>
+                    <Text style={[s.modelChipText, { color: C.cyan }]}>MEDICAL TRIAGE</Text>
+                  </View>
+                )}
+              </View>
+
               <Text style={s.resultText}>{result.text}</Text>
+
+              {/* RAG citations from the bundled offline field manual */}
+              {result.citations.length > 0 && (
+                <View style={s.sources}>
+                  <Text style={s.sourcesTitle}>📑 SOURCES · OFFLINE FIELD MANUAL</Text>
+                  {result.citations.map((c) => (
+                    <View key={c.id} style={s.citation}>
+                      <Text style={s.citationPage}>p.{c.page}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.citationTitle}>{c.title}</Text>
+                        <Text style={s.citationSnippet} numberOfLines={2}>{c.snippet}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
               {result.tokensPerSec != null && (
                 <View style={s.telemetry}>
                   <Text style={s.telemetryText}>
@@ -210,8 +240,7 @@ export default function App() {
         )}
 
       </ScrollView>
-      </SafeAreaView>
-    </SafeAreaProvider>
+    </SafeAreaView>
   );
 }
 
@@ -222,7 +251,7 @@ const s = StyleSheet.create({
   
   header: { marginBottom: 30, marginTop: 10 },
   headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  logoIcon: { fontSize: 42, marginRight: 12, textShadowColor: C.cyan, textShadowOffset: {width: 0, height: 0}, textShadowRadius: 10 },
+  logoIcon: { fontSize: 42, marginRight: 12, textShadowColor: C.cyan, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 },
   title: { fontSize: 28, fontWeight: '900', color: C.text, letterSpacing: 4, fontFamily: 'monospace' },
   subtitle: { fontSize: 12, color: C.cyan, fontWeight: '700', letterSpacing: 2, fontFamily: 'monospace' },
   
@@ -230,7 +259,7 @@ const s = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, marginRight: 8 },
   pillText: { fontSize: 10, fontWeight: '800', letterSpacing: 2, fontFamily: 'monospace' },
 
-  topoBadge: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 16, marginBottom: 24, shadowColor: C.cyan, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 10 },
+  topoBadge: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 16, marginBottom: 24, boxShadow: `0px 0px 10px ${C.cyan}33` },
   topoIconWrapper: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center', marginRight: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   topoIcon: { fontSize: 20 },
   topoLabel: { fontSize: 14, fontWeight: '800', letterSpacing: 2, fontFamily: 'monospace', marginBottom: 4 },
@@ -260,6 +289,18 @@ const s = StyleSheet.create({
   resultMode: { fontSize: 10, fontWeight: '800', letterSpacing: 1.5, fontFamily: 'monospace' },
   latency: { fontSize: 11, color: C.amber, fontFamily: 'monospace', fontWeight: '700' },
   resultText: { fontSize: 14, color: C.text, lineHeight: 24 },
+
+  modelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  modelChip: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: 'rgba(0,0,0,0.3)' },
+  modelChipText: { fontSize: 10, fontWeight: '800', letterSpacing: 1, fontFamily: 'monospace' },
+
+  sources: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.border },
+  sourcesTitle: { fontSize: 10, fontWeight: '800', color: C.cyan, letterSpacing: 1.5, fontFamily: 'monospace', marginBottom: 10 },
+  citation: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, gap: 10 },
+  citationPage: { fontSize: 10, fontWeight: '800', color: C.amber, fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, overflow: 'hidden' },
+  citationTitle: { fontSize: 12, fontWeight: '700', color: C.text, marginBottom: 2 },
+  citationSnippet: { fontSize: 11, color: C.text2, lineHeight: 16 },
+
   telemetry: { marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border },
   telemetryText: { fontSize: 11, color: C.text2, fontFamily: 'monospace', letterSpacing: 0.5 }
 });

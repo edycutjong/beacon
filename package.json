@@ -7,14 +7,20 @@
     "expo": "~56.0.8",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.85.3",
+    "react-native-bare-kit": "latest",
     "react-native-safe-area-context": "latest",
-    "react-native-bare-kit": "latest"
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@lhci/cli": "^0.14.0",
+    "@playwright/test": "^1.52.0",
     "@types/node": "^22.0.0",
     "@types/react": "~19.2.2",
     "@vitest/coverage-v8": "^4.1.8",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~56.0.4",
     "tsx": "^4.19.0",
     "typescript": "~6.0.3",
     "vitest": "^4.1.8"
@@ -25,9 +31,14 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "ci": "npm run typecheck && npm test"
+    "test": "vitest run --silent",
+    "test:coverage": "vitest run --coverage --silent",
+    "e2e": "npx playwright test",
+    "e2e:ui": "npx playwright test --ui",
+    "lighthouse": "npx lhci autorun",
+    "lint": "expo lint",
+    "lint:fix": "eslint . --fix",
+    "ci": "npm run lint && npm run typecheck && npm test"
   },
   "private": true
 }

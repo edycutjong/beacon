@@ -1,30 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock @qvac/sdk
-const mockLoadModel = vi.fn();
-const mockUnloadModel = vi.fn();
-const mockCompletion = vi.fn();
-const mockTextToSpeech = vi.fn();
-const mockStartQVACProvider = vi.fn();
-const mockStopQVACProvider = vi.fn();
-const mockRagIngest = vi.fn();
-const mockRagSearch = vi.fn();
-
-vi.mock("@qvac/sdk", () => ({
-  loadModel: (...args: any[]) => mockLoadModel(...args),
-  unloadModel: (...args: any[]) => mockUnloadModel(...args),
-  completion: (...args: any[]) => mockCompletion(...args),
-  textToSpeech: (...args: any[]) => mockTextToSpeech(...args),
-  startQVACProvider: (...args: any[]) => mockStartQVACProvider(...args),
-  stopQVACProvider: (...args: any[]) => mockStopQVACProvider(...args),
-  ragIngest: (...args: any[]) => mockRagIngest(...args),
-  ragSearch: (...args: any[]) => mockRagSearch(...args),
-  LLAMA_3_2_1B_INST_Q4_0: "llama-model",
-  GTE_LARGE_FP16: "gte-model",
-  TTS_EN_SUPERTONIC_Q8_0: { src: "tts-src" },
-  WHISPER_EN_TINY_Q8_0: "whisper-model",
-}));
-
 // Import Beacon core modules and qvac wrappers
 import {
   startBeaconHost,
@@ -60,7 +35,37 @@ import {
   getAuditLog,
   clearAuditLog,
   getAuditSummary,
+  setAuditSink,
 } from "../audit";
+import * as audit from "../audit";
+
+import { classifyDomain, domainLabel } from "../domain";
+import { lexicalSearch, retrieveCitations } from "../rag";
+
+// Mock @qvac/sdk
+const mockLoadModel = vi.fn();
+const mockUnloadModel = vi.fn();
+const mockCompletion = vi.fn();
+const mockTextToSpeech = vi.fn();
+const mockStartQVACProvider = vi.fn();
+const mockStopQVACProvider = vi.fn();
+const mockRagIngest = vi.fn();
+const mockRagSearch = vi.fn();
+
+vi.mock("@qvac/sdk", () => ({
+  loadModel: (...args: any[]) => mockLoadModel(...args),
+  unloadModel: (...args: any[]) => mockUnloadModel(...args),
+  completion: (...args: any[]) => mockCompletion(...args),
+  textToSpeech: (...args: any[]) => mockTextToSpeech(...args),
+  startQVACProvider: (...args: any[]) => mockStartQVACProvider(...args),
+  stopQVACProvider: (...args: any[]) => mockStopQVACProvider(...args),
+  ragIngest: (...args: any[]) => mockRagIngest(...args),
+  ragSearch: (...args: any[]) => mockRagSearch(...args),
+  LLAMA_3_2_1B_INST_Q4_0: "llama-model",
+  GTE_LARGE_FP16: "gte-model",
+  TTS_EN_SUPERTONIC_Q8_0: { src: "tts-src" },
+  WHISPER_EN_TINY_Q8_0: "whisper-model",
+}));
 
 describe("Beacon Core Module", () => {
   beforeEach(() => {
@@ -193,6 +198,18 @@ describe("Beacon Core Module", () => {
         modelSrc: "llama-model",
         modelType: "llamacpp-completion",
       });
+    });
+
+    it("should handle empty audit log gracefully in lastCompletionMetrics", async () => {
+      mockLoadModel.mockResolvedValue("local-model-id");
+      mockCompletion.mockResolvedValue({ text: Promise.resolve("local concise answer") });
+      const spy = vi.spyOn(audit, "getAuditLog").mockReturnValue([]);
+
+      const result = await runRoute("hello", false);
+      expect(result.tokenCount).toBeUndefined();
+      expect(result.tokensPerSec).toBeUndefined();
+
+      spy.mockRestore();
     });
   });
 
@@ -447,6 +464,81 @@ describe("Audit Log", () => {
     expect(completions[0].ttftMs).toBeGreaterThanOrEqual(0);
   });
 
+  it("falls back to totalMs for ttftMs if stream is empty", async () => {
+    async function* emptyStream() {}
+    mockCompletion.mockReturnValue({ tokenStream: emptyStream() });
+
+    const res = await runCompletion({ modelId: "mid", history: [], stream: true });
+    const out: string[] = [];
+    for await (const t of res.tokenStream as AsyncGenerator<string>) out.push(t);
+    expect(out).toHaveLength(0);
+
+    const completions = getAuditLog().filter((e) => e.type === "completion");
+    const last = completions[completions.length - 1];
+    expect(last.streamed).toBe(true);
+    expect(last.tokenCount).toBe(0);
+    expect(last.ttftMs).toBeDefined();
+    expect(last.ttftMs).toBe(last.totalMs);
+  });
+
+  it("records model load with undefined modelType for consoleSink branch", () => {
+    recordModelLoad("no-type-id", undefined, 100);
+    const log = getAuditLog();
+    expect(log[log.length - 1]?.modelId).toBe("no-type-id");
+  });
+
+  it("records completion with missing optional fields for branches", () => {
+    recordCompletion({ modelId: "missing-fields", totalMs: 100, tokenCount: 10, source: "delegated", streamed: true });
+    const log1 = getAuditLog();
+    const e = log1[log1.length - 1]!;
+    expect(e.streamed).toBe(true);
+    expect(e.source).toBe("delegated");
+
+    recordCompletion({ modelId: "zero-tps", totalMs: 0, tokenCount: 0 });
+    const log2 = getAuditLog();
+    const e2 = log2[log2.length - 1]!;
+    expect(e2.tokensPerSec).toBe(0);
+  });
+
+  it("respects MAX_EVENTS limit", () => {
+    clearAuditLog();
+    for (let i = 0; i < 505; i++) {
+      recordModelLoad(`model-${i}`, "llamacpp-completion", 100);
+    }
+    const log = getAuditLog();
+    expect(log).toHaveLength(500);
+    expect(log[0].modelId).toBe("model-5");
+  });
+
+  it("handles model unload for unknown model in summary", () => {
+    clearAuditLog();
+    recordModelUnload("unknown-model");
+    const s = getAuditSummary();
+    expect(s.unloads).toBe(1);
+  });
+
+  it("handles defensive undefined metrics in summary", () => {
+    clearAuditLog();
+    const log = getAuditLog() as any[];
+    log.push({ type: "completion", modelId: "raw-event" });
+    const s = getAuditSummary();
+    expect(s.avgTtftMs).toBeNull();
+    expect(s.avgTokensPerSec).toBeNull();
+  });
+
+  it("allows setting a custom audit sink and handles sink errors", () => {
+    const mockSink = vi.fn();
+    setAuditSink(mockSink);
+    recordModelLoad("sink-test", "llamacpp-completion", 100);
+    expect(mockSink).toHaveBeenCalled();
+
+    const throwingSink = () => { throw new Error("sink error"); };
+    setAuditSink(throwingSink);
+    expect(() => recordModelLoad("sink-error-test", "llamacpp-completion", 100)).not.toThrow();
+
+    setAuditSink(null);
+  });
+
   it("records load + unload through the qvac wrappers", async () => {
     mockLoadModel.mockResolvedValue("loaded-id");
     mockUnloadModel.mockResolvedValue(undefined);
@@ -458,6 +550,13 @@ describe("Audit Log", () => {
     expect(s.loads).toBe(1);
     expect(s.unloads).toBe(1);
     expect(s.activeModels).toEqual([]); // loaded then unloaded
+  });
+
+  it("returns null averages when there are no valid completions", () => {
+    clearAuditLog();
+    const s = getAuditSummary();
+    expect(s.avgTtftMs).toBeNull();
+    expect(s.avgTokensPerSec).toBeNull();
   });
 });
 
@@ -511,5 +610,592 @@ describe("routing edge cases", () => {
 
     const r = await runRoute("a".repeat(200), false);
     expect(r.source).toBe("local");
+  });
+});
+
+describe("p2p pairing — key format validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearPairing();
+  });
+
+  it("accepts an all-lowercase 64-hex key", () => {
+    const key = "0123456789abcdef".repeat(4);
+    pairWithProvider(key);
+    expect(getPairedProviderKey()).toBe(key);
+  });
+
+  it("accepts an all-uppercase 64-hex key", () => {
+    const key = "0123456789ABCDEF".repeat(4);
+    pairWithProvider(key);
+    expect(getPairedProviderKey()).toBe(key);
+  });
+
+  it("accepts a mixed-case 64-hex key", () => {
+    const key = "0123456789aBcDeF".repeat(4);
+    pairWithProvider(key);
+    expect(getPairedProviderKey()).toBe(key);
+  });
+
+  it("accepts an all-zero 64-hex key", () => {
+    const key = "0".repeat(64);
+    pairWithProvider(key);
+    expect(getPairedProviderKey()).toBe(key);
+  });
+
+  it("rejects a 63-character key (one short)", () => {
+    expect(() => pairWithProvider("a".repeat(63))).toThrow("64-character hex");
+    expect(getPairedProviderKey()).toBeNull();
+  });
+
+  it("rejects a 65-character key (one long)", () => {
+    expect(() => pairWithProvider("a".repeat(65))).toThrow("64-character hex");
+    expect(getPairedProviderKey()).toBeNull();
+  });
+
+  it("rejects an empty string", () => {
+    expect(() => pairWithProvider("")).toThrow("64-character hex");
+    expect(getPairedProviderKey()).toBeNull();
+  });
+
+  it("rejects a 64-char string containing non-hex letters (g–z)", () => {
+    expect(() => pairWithProvider("g".repeat(64))).toThrow("64-character hex");
+    expect(getPairedProviderKey()).toBeNull();
+  });
+
+  it("rejects a key padded with surrounding whitespace", () => {
+    expect(() => pairWithProvider(" " + "a".repeat(62) + " ")).toThrow("64-character hex");
+    expect(getPairedProviderKey()).toBeNull();
+  });
+
+  it("rejects a key with an embedded space", () => {
+    expect(() => pairWithProvider("a".repeat(32) + " " + "a".repeat(31))).toThrow("64-character hex");
+    expect(getPairedProviderKey()).toBeNull();
+  });
+
+  it("overwrites the previous key when re-paired", () => {
+    const first = "a".repeat(64);
+    const second = "b".repeat(64);
+    pairWithProvider(first);
+    pairWithProvider(second);
+    expect(getPairedProviderKey()).toBe(second);
+  });
+
+  it("a failed re-pair leaves the existing key intact", () => {
+    const good = "a".repeat(64);
+    pairWithProvider(good);
+    expect(() => pairWithProvider("nope")).toThrow();
+    expect(getPairedProviderKey()).toBe(good);
+  });
+
+  it("clearPairing is idempotent", () => {
+    pairWithProvider("c".repeat(64));
+    clearPairing();
+    clearPairing();
+    expect(getPairedProviderKey()).toBeNull();
+  });
+});
+
+describe("p2p host lifecycle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearPairing();
+  });
+
+  it("uses the default 'beacon-field-compute' topic when none is given", async () => {
+    mockStartQVACProvider.mockResolvedValue({ success: true, publicKey: "k" });
+    await startBeaconHost();
+    expect(mockStartQVACProvider).toHaveBeenCalledWith({
+      topic: "beacon-field-compute",
+      firewall: { mode: "allow", publicKeys: [] },
+    });
+  });
+
+  it("forwards a custom topic to the provider", async () => {
+    mockStartQVACProvider.mockResolvedValue({ success: true, publicKey: "k" });
+    await startBeaconHost("custom-topic");
+    expect(mockStartQVACProvider).toHaveBeenCalledWith({
+      topic: "custom-topic",
+      firewall: { mode: "allow", publicKeys: [] },
+    });
+  });
+
+  it("returns the provider's public key on success", async () => {
+    mockStartQVACProvider.mockResolvedValue({ success: true, publicKey: "pub-123" });
+    await expect(startBeaconHost()).resolves.toBe("pub-123");
+  });
+
+  it("stopBeaconHost delegates to stopQVACProvider exactly once", async () => {
+    mockStopQVACProvider.mockResolvedValue(undefined);
+    await stopBeaconHost();
+    expect(mockStopQVACProvider).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("router — decision truth table", () => {
+  // shouldDelegate(query, isImage, hasPeer) === (isImage || query.length > 200) && hasPeer
+  it("short text, no image, no peer → local (false)", () => {
+    expect(shouldDelegate("hi", false, false)).toBe(false);
+  });
+  it("short text, no image, peer → local (false)", () => {
+    expect(shouldDelegate("hi", false, true)).toBe(false);
+  });
+  it("long text, no image, no peer → local (false)", () => {
+    expect(shouldDelegate("a".repeat(201), false, false)).toBe(false);
+  });
+  it("long text, no image, peer → delegate (true)", () => {
+    expect(shouldDelegate("a".repeat(201), false, true)).toBe(true);
+  });
+  it("short text, image, no peer → local (false)", () => {
+    expect(shouldDelegate("hi", true, false)).toBe(false);
+  });
+  it("short text, image, peer → delegate (true)", () => {
+    expect(shouldDelegate("hi", true, true)).toBe(true);
+  });
+  it("image dominates even for a boundary-length (200) query", () => {
+    expect(shouldDelegate("a".repeat(200), true, true)).toBe(true);
+  });
+  it("is a pure function — repeated calls give the same answer", () => {
+    const a = shouldDelegate("a".repeat(300), false, true);
+    const b = shouldDelegate("a".repeat(300), false, true);
+    expect(a).toBe(b);
+    expect(a).toBe(true);
+  });
+});
+
+describe("router — runRoute behaviour", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearPairing();
+    clearAuditLog();
+  });
+
+  it("reports a non-negative latency for a local route", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    const r = await runRoute("hi", false);
+    expect(r.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("unloads the model after a local route", async () => {
+    mockLoadModel.mockResolvedValue("m-local");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    mockUnloadModel.mockResolvedValue(undefined);
+    await runRoute("hi", false);
+    expect(mockUnloadModel).toHaveBeenCalledWith({ modelId: "m-local" });
+  });
+
+  it("unloads the model after a delegated route", async () => {
+    pairWithProvider("e".repeat(64));
+    mockLoadModel.mockResolvedValue("m-deleg");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    mockUnloadModel.mockResolvedValue(undefined);
+    await runRoute("a".repeat(250), false);
+    expect(mockUnloadModel).toHaveBeenCalledWith({ modelId: "m-deleg" });
+  });
+
+  it("delegates an image query when a peer is paired", async () => {
+    const peer = "f".repeat(64);
+    pairWithProvider(peer);
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("vision answer") });
+    const r = await runRoute("what is this", true);
+    expect(r.source).toBe("delegated");
+    expect(r.peerId).toBe(peer);
+  });
+
+  it("runs an image query locally when no peer is paired", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("local vision answer") });
+    const r = await runRoute("what is this", true);
+    expect(r.source).toBe("local");
+    expect(r.peerId).toBeUndefined();
+  });
+
+  it("a local route carries no peerId", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    const r = await runRoute("hi", false);
+    expect(r.peerId).toBeUndefined();
+  });
+
+  it("uses the 'highly capable delegated' system prompt when delegating", async () => {
+    pairWithProvider("a".repeat(64));
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    await runRoute("a".repeat(250), false);
+    const history = mockCompletion.mock.calls[0][0].history;
+    expect(history[0].role).toBe("system");
+    expect(history[0].content).toContain("delegated AI compute provider");
+    expect(history[1]).toEqual({ role: "user", content: "a".repeat(250) });
+  });
+
+  it("uses the 'lightweight on-device' system prompt when local", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("ok") });
+    await runRoute("hi", false);
+    const history = mockCompletion.mock.calls[0][0].history;
+    expect(history[0].content).toContain("lightweight on-device");
+  });
+
+  it("propagates tokenCount and tokensPerSec from the audit log", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("a longer answer with some tokens") });
+    const r = await runRoute("hi", false);
+    expect(r.tokenCount).toBeGreaterThan(0);
+    expect(r.tokensPerSec).toBeGreaterThanOrEqual(0);
+  });
+
+  it("attempts to load twice (delegate then local) when the peer drops", async () => {
+    pairWithProvider("a".repeat(64));
+    mockLoadModel
+      .mockRejectedValueOnce(new Error("peer gone"))
+      .mockResolvedValueOnce("local-id");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("fallback") });
+    const r = await runRoute("a".repeat(250), false);
+    expect(r.source).toBe("local");
+    expect(mockLoadModel).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back to local when the delegated completion itself fails", async () => {
+    pairWithProvider("a".repeat(64));
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion
+      .mockRejectedValueOnce(new Error("delegated inference failed"))
+      .mockResolvedValueOnce({ text: Promise.resolve("local recovery") });
+    const r = await runRoute("a".repeat(250), false);
+    expect(r.source).toBe("local");
+    expect(r.text).toBe("local recovery");
+  });
+});
+
+describe("qvac wrappers — call shapes & audit", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAuditLog();
+  });
+
+  it("loadLLMModel (default) loads the Llama model with no delegate block", async () => {
+    mockLoadModel.mockResolvedValue("llm-id");
+    await loadLLMModel();
+    expect(mockLoadModel).toHaveBeenCalledWith({
+      modelSrc: "llama-model",
+      modelType: "llamacpp-completion",
+    });
+  });
+
+  it("loadLLMModel records a model_load audit event", async () => {
+    mockLoadModel.mockResolvedValue("llm-id");
+    await loadLLMModel();
+    const last = getAuditLog().at(-1)!;
+    expect(last.type).toBe("model_load");
+    expect(last.modelType).toBe("llamacpp-completion");
+  });
+
+  it("loadEmbeddingModel loads the GTE model as 'embeddings'", async () => {
+    mockLoadModel.mockResolvedValue("emb-id");
+    await loadEmbeddingModel();
+    expect(mockLoadModel).toHaveBeenCalledWith({
+      modelSrc: "gte-model",
+      modelType: "embeddings",
+    });
+    expect(getAuditLog().at(-1)!.modelType).toBe("embeddings");
+  });
+
+  it("loadTTSModel loads the supertonic source as 'tts' with language config", async () => {
+    mockLoadModel.mockResolvedValue("tts-id");
+    await loadTTSModel();
+    expect(mockLoadModel).toHaveBeenCalledWith({
+      modelSrc: "tts-src",
+      modelType: "tts",
+      modelConfig: { language: "en" },
+    });
+  });
+
+  it("runCompletion attaches the images array for multimodal calls", async () => {
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("seen") });
+    const img = new Uint8Array([4, 5, 6]);
+    await runCompletion({ modelId: "m", history: [], images: [img] });
+    expect(mockCompletion.mock.calls[0][0].images).toEqual([img]);
+  });
+
+  it("runCompletion omits the images key when none are provided", async () => {
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("text only") });
+    await runCompletion({ modelId: "m", history: [] });
+    expect(mockCompletion.mock.calls[0][0]).not.toHaveProperty("images");
+  });
+
+  it("runCompletion defaults stream to false", async () => {
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("x") });
+    await runCompletion({ modelId: "m", history: [] });
+    expect(mockCompletion.mock.calls[0][0].stream).toBe(false);
+  });
+
+  it("runSaveEmbeddings defaults chunk to false", async () => {
+    mockRagIngest.mockResolvedValue({ success: true });
+    await runSaveEmbeddings({ modelId: "m", documents: ["d"] });
+    expect(mockRagIngest.mock.calls[0][0].chunk).toBe(false);
+  });
+
+  it("runSaveEmbeddings forwards chunk:true", async () => {
+    mockRagIngest.mockResolvedValue({ success: true });
+    await runSaveEmbeddings({ modelId: "m", documents: ["d"], chunk: true });
+    expect(mockRagIngest.mock.calls[0][0].chunk).toBe(true);
+  });
+
+  it("runRagSearch defaults topK to 5", async () => {
+    mockRagSearch.mockResolvedValue([]);
+    await runRagSearch({ modelId: "m", query: "q" });
+    expect(mockRagSearch.mock.calls[0][0].topK).toBe(5);
+  });
+
+  it("runRagSearch forwards a custom topK", async () => {
+    mockRagSearch.mockResolvedValue([]);
+    await runRagSearch({ modelId: "m", query: "q", topK: 12 });
+    expect(mockRagSearch.mock.calls[0][0].topK).toBe(12);
+  });
+
+  it("runTextToSpeech unloads the TTS model after synthesis", async () => {
+    mockLoadModel.mockResolvedValue("tts-id");
+    mockTextToSpeech.mockReturnValue({ buffer: Promise.resolve(new Uint8Array([1])) });
+    mockUnloadModel.mockResolvedValue(undefined);
+    await runTextToSpeech({ text: "hello" });
+    expect(mockUnloadModel).toHaveBeenCalledWith({ modelId: "tts-id" });
+  });
+
+  it("startP2PProvider passes undefined firewall when none is supplied", async () => {
+    mockStartQVACProvider.mockResolvedValue({ success: true, publicKey: "k" });
+    await startP2PProvider({ topic: "t" });
+    expect(mockStartQVACProvider).toHaveBeenCalledWith({ topic: "t", firewall: undefined });
+  });
+
+  it("startP2PProvider passes a failure response straight through", async () => {
+    mockStartQVACProvider.mockResolvedValue({ success: false, error: "denied" });
+    const res = await startP2PProvider({ topic: "t" });
+    expect(res).toEqual({ success: false, error: "denied" });
+  });
+
+  it("stopP2PProvider resolves when the SDK stop succeeds", async () => {
+    mockStopQVACProvider.mockResolvedValue(undefined);
+    await expect(stopP2PProvider()).resolves.toBeUndefined();
+  });
+});
+
+describe("audit — estimation, recording & summaries", () => {
+  beforeEach(() => {
+    clearAuditLog();
+    setAuditSink(null);
+  });
+
+  it("estimateTokens rounds up to whole tokens (~4 chars each)", () => {
+    expect(estimateTokens("ab")).toBe(1);
+    expect(estimateTokens("abcde")).toBe(2);
+    expect(estimateTokens("a".repeat(9))).toBe(3);
+  });
+
+  it("estimateTokens returns 0 for empty input", () => {
+    expect(estimateTokens("")).toBe(0);
+  });
+
+  it("recordCompletion defaults streamed to false", () => {
+    recordCompletion({ modelId: "m", totalMs: 100, tokenCount: 10 });
+    expect(getAuditLog().at(-1)!.streamed).toBe(false);
+  });
+
+  it("recordCompletion defaults ttftMs to totalMs", () => {
+    recordCompletion({ modelId: "m", totalMs: 250, tokenCount: 10 });
+    expect(getAuditLog().at(-1)!.ttftMs).toBe(250);
+  });
+
+  it("recordCompletion derives tokens/sec from totalMs", () => {
+    recordCompletion({ modelId: "m", totalMs: 500, tokenCount: 50 });
+    expect(getAuditLog().at(-1)!.tokensPerSec).toBe(100); // 50 tok / 0.5s
+  });
+
+  it("getAuditSummary totalEvents counts every recorded event", () => {
+    recordModelLoad("a", "llamacpp-completion", 10);
+    recordCompletion({ modelId: "a", totalMs: 100, tokenCount: 4 });
+    recordModelUnload("a");
+    expect(getAuditSummary().totalEvents).toBe(3);
+  });
+
+  it("getAuditSummary treats a model loaded twice and unloaded once as still active", () => {
+    recordModelLoad("dup", "llamacpp-completion", 10);
+    recordModelLoad("dup", "llamacpp-completion", 10);
+    recordModelUnload("dup");
+    expect(getAuditSummary().activeModels).toEqual(["dup"]);
+  });
+
+  it("getAuditSummary excludes zero-throughput completions from the average", () => {
+    recordCompletion({ modelId: "a", totalMs: 0, tokenCount: 0 }); // tps 0 → excluded
+    recordCompletion({ modelId: "b", totalMs: 1000, tokenCount: 20 }); // 20 tok/s
+    expect(getAuditSummary().avgTokensPerSec).toBe(20);
+  });
+
+  it("a custom sink receives all three event types", () => {
+    const seen: string[] = [];
+    setAuditSink((e) => seen.push(e.type));
+    recordModelLoad("a", "llamacpp-completion", 10);
+    recordCompletion({ modelId: "a", totalMs: 100, tokenCount: 4 });
+    recordModelUnload("a");
+    expect(seen).toEqual(["model_load", "completion", "model_unload"]);
+    setAuditSink(null);
+  });
+
+  it("getAuditLog reflects clearing", () => {
+    recordModelLoad("a", "llamacpp-completion", 10);
+    expect(getAuditLog().length).toBe(1);
+    clearAuditLog();
+    expect(getAuditLog().length).toBe(0);
+  });
+
+  it("recordModelLoad returns the event it pushed", () => {
+    const ev = recordModelLoad("ret", "tts", 33);
+    expect(ev).toMatchObject({ type: "model_load", modelId: "ret", loadMs: 33 });
+  });
+});
+
+describe("domain classifier (MedPsy routing)", () => {
+  it("classifies obvious medical queries as 'medical'", () => {
+    expect(classifyDomain("How do I treat a severe bleeding wound?")).toBe("medical");
+    expect(classifyDomain("Is this a fracture or a sprain?")).toBe("medical");
+    expect(classifyDomain("Steps for CPR on an unconscious casualty")).toBe("medical");
+    expect(classifyDomain("How to manage a crush injury")).toBe("medical");
+  });
+
+  it("classifies non-medical queries as 'general'", () => {
+    expect(classifyDomain("What is the bearing back to base camp?")).toBe("general");
+    expect(classifyDomain("Summarize the comms log")).toBe("general");
+    expect(classifyDomain("")).toBe("general");
+  });
+
+  it("is case-insensitive", () => {
+    expect(classifyDomain("TOURNIQUET PLACEMENT")).toBe("medical");
+    expect(classifyDomain("Bleeding Control")).toBe("medical");
+  });
+
+  it("matches inflected forms via substring (injur → injury/injuries)", () => {
+    expect(classifyDomain("triage the injured first")).toBe("medical");
+    expect(classifyDomain("multiple injuries reported")).toBe("medical");
+  });
+
+  it("exposes a human label per domain", () => {
+    expect(domainLabel("medical")).toBe("MEDICAL TRIAGE");
+    expect(domainLabel("general")).toBe("GENERAL");
+  });
+});
+
+describe("RAG lexical retrieval over the field manual", () => {
+  it("returns relevant, scored citations for a medical query", () => {
+    const hits = lexicalSearch("how to stop severe bleeding with a tourniquet");
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0].title).toMatch(/Bleeding|Tourniquet/i);
+    expect(hits[0].page).toBeGreaterThan(0);
+    expect(hits[0].snippet.length).toBeGreaterThan(0);
+  });
+
+  it("sorts citations by descending score", () => {
+    const hits = lexicalSearch("burn and bleeding and fracture splint");
+    for (let i = 1; i < hits.length; i++) {
+      expect(hits[i - 1].score).toBeGreaterThanOrEqual(hits[i].score);
+    }
+  });
+
+  it("respects the topK limit", () => {
+    const hits = lexicalSearch("bleeding burn fracture shock hypothermia water fire", 2);
+    expect(hits.length).toBeLessThanOrEqual(2);
+  });
+
+  it("returns no citations for an empty or stopword-only query", () => {
+    expect(lexicalSearch("")).toEqual([]);
+    expect(lexicalSearch("the and for")).toEqual([]);
+  });
+
+  it("returns no citations when nothing matches the manual", () => {
+    expect(lexicalSearch("quarterly blockchain tokenomics roadmap")).toEqual([]);
+  });
+});
+
+describe("retrieveCitations (SDK-first, lexical fallback)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("maps QVAC ragSearch hits into citations when the index returns results", async () => {
+    mockRagSearch.mockResolvedValue([
+      { id: "h1", title: "Indexed Section", page: 99, content: "indexed snippet", score: 5 },
+    ]);
+    const cites = await retrieveCitations("anything");
+    expect(cites[0]).toMatchObject({ id: "h1", title: "Indexed Section", page: 99, snippet: "indexed snippet" });
+  });
+
+  it("falls back to lexical search when ragSearch returns empty", async () => {
+    mockRagSearch.mockResolvedValue([]);
+    const cites = await retrieveCitations("treat a burn with cool water");
+    expect(cites.length).toBeGreaterThan(0);
+    expect(cites[0].title).toMatch(/Burn/i);
+  });
+
+  it("falls back to lexical search when ragSearch throws", async () => {
+    mockRagSearch.mockRejectedValue(new Error("no index loaded"));
+    const cites = await retrieveCitations("hypothermia rewarming");
+    expect(cites.length).toBeGreaterThan(0);
+    expect(cites[0].title).toMatch(/Hypothermia/i);
+  });
+});
+
+describe("router — domain routing & grounded answers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearPairing();
+    clearAuditLog();
+    mockRagSearch.mockResolvedValue([]); // force the offline lexical path
+  });
+
+  it("routes a medical query to the MedPsy model", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("apply a tourniquet") });
+    const r = await runRoute("how do I treat a severe bleeding wound", false);
+    expect(r.domain).toBe("medical");
+    expect(r.model).toBe("MedPsy-1.7B");
+    expect(mockLoadModel.mock.calls[0][0].modelSrc).toBe("MedPsy-1.7B");
+  });
+
+  it("routes a general query to the Llama model", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("take a back-bearing") });
+    const r = await runRoute("what is the bearing back to base camp", false);
+    expect(r.domain).toBe("general");
+    expect(r.model).toBe("Llama-3.2-1B");
+    expect(mockLoadModel.mock.calls[0][0].modelSrc).toBe("llama-model");
+  });
+
+  it("attaches field-manual citations to a grounded answer", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("cool the burn") });
+    const r = await runRoute("how to treat a thermal burn in the field", false);
+    expect(r.citations.length).toBeGreaterThan(0);
+    expect(r.citations[0].page).toBeGreaterThan(0);
+  });
+
+  it("injects the retrieved excerpts into the system prompt (RAG grounding)", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("...") });
+    await runRoute("steps to control severe bleeding with a tourniquet", false);
+    const systemContent = mockCompletion.mock.calls[0][0].history[0].content;
+    expect(systemContent).toContain("field-manual excerpts");
+    expect(systemContent).toMatch(/\[p\.\d+\]/);
+  });
+
+  it("leaves the system prompt ungrounded when no citation matches", async () => {
+    mockLoadModel.mockResolvedValue("m");
+    mockCompletion.mockResolvedValue({ text: Promise.resolve("...") });
+    await runRoute("quarterly blockchain tokenomics roadmap", false);
+    const systemContent = mockCompletion.mock.calls[0][0].history[0].content;
+    expect(systemContent).not.toContain("field-manual excerpts");
+    expect(mockCompletion.mock.calls[0][0].history[1]).toEqual({
+      role: "user",
+      content: "quarterly blockchain tokenomics roadmap",
+    });
   });
 });

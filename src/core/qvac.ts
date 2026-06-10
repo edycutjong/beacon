@@ -2,7 +2,6 @@ import {
   loadModel,
   unloadModel,
   completion,
-  embed as _embed,
   ragIngest,
   ragSearch,
   textToSpeech,
@@ -11,7 +10,6 @@ import {
   LLAMA_3_2_1B_INST_Q4_0,
   GTE_LARGE_FP16,
   TTS_EN_SUPERTONIC_Q8_0,
-  WHISPER_EN_TINY_Q8_0 as _WHISPER_EN_TINY_Q8_0,
 } from "@qvac/sdk";
 import { recordModelLoad, recordModelUnload, recordCompletion, estimateTokens } from "./audit";
 

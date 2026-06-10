@@ -1,4 +1,4 @@
-.PHONY: start provider typecheck ci test bench verify readiness security-scan
+.PHONY: start provider typecheck ci test bench verify readiness security-scan e2e lighthouse
 
 provider:
 	npm run provider
@@ -26,6 +26,14 @@ verify:
 
 readiness:
 	python3 scripts/check_submission_readiness.py
+
+e2e:
+	@echo "🎭 Running Playwright E2E tests (demo mode)..."
+	npx playwright test
+
+lighthouse:
+	@echo "🔦 Running Lighthouse CI audit..."
+	npx lhci autorun
 
 security-scan:
 	npx trufflehog filesystem . --only-verified 2>/dev/null || echo "Install trufflehog for secret scanning"

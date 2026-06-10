@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "dorahacks-qvec-beacon",
+    "name": "Beacon",
     "slug": "dorahacks-qvec-beacon",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -23,7 +23,8 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@qvac/sdk/expo-plugin"
+      "@qvac/sdk/expo-plugin",
+      "./withAndroidShrinkFix.js"
     ]
   }
 }

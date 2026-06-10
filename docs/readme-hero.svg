@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <radialGradient id="glowC" cx="0%" cy="0%" r="70%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.35"/><stop offset="50%" stop-color="#06b6d4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowA" cx="100%" cy="100%" r="70%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.35"/><stop offset="50%" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#06b6d4"/><stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="leftFade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="60%" stop-color="#0a0a0a"/><stop offset="100%" stop-color="#0a0a0a" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity="0.04" stroke-width="1"/>
+    </pattern>
+    <!-- Soft halo so the wordmark glows against the dark grid -->
+    <filter id="titleGlow" x="-30%" y="-60%" width="160%" height="220%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <style>
+    text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; }
+    .lede { font-family: ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  </style>
+
+  <rect width="1280" height="640" fill="#0a0a0a"/>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+  <rect width="1280" height="640" fill="url(#glowC)"/>
+  <rect width="1280" height="640" fill="url(#glowA)"/>
+  <rect x="0" y="0" width="620" height="640" fill="url(#leftFade)"/>
+
+  <!-- left panel (native) -->
+  <path filter="url(#titleGlow)" d="M52.25 180L52.25 128.16L91.70 128.16Q94.51 128.16 96.85 129.56Q99.19 130.97 100.63 133.31Q102.07 135.65 102.07 138.53L102.07 148.46Q102.07 149.40 101.93 150.23Q101.78 151.06 101.50 151.85Q102.65 153.36 103.37 155.12Q104.09 156.89 104.09 158.69L104.09 169.63Q104.09 172.51 102.65 174.85Q101.21 177.19 98.87 178.60Q96.53 180 93.65 180L52.25 180M63.05 169.56L93.14 169.56Q93.36 169.56 93.47 169.45Q93.58 169.34 93.58 169.13L93.58 159.26Q93.58 159.12 93.47 158.98Q93.36 158.83 93.14 158.83L63.05 158.83Q62.83 158.83 62.72 158.98Q62.62 159.12 62.62 159.26L62.62 169.13Q62.62 169.34 62.72 169.45Q62.83 169.56 63.05 169.56M63.05 148.39L91.13 148.39Q91.27 148.39 91.42 148.28Q91.56 148.18 91.56 148.03L91.56 139.03Q91.56 138.82 91.42 138.71Q91.27 138.60 91.13 138.60L63.05 138.60Q62.83 138.60 62.72 138.71Q62.62 138.82 62.62 139.03L62.62 148.03Q62.62 148.18 62.72 148.28Q62.83 148.39 63.05 148.39M121.73 180Q118.99 180 116.69 178.60Q114.38 177.19 112.98 174.89Q111.58 172.58 111.58 169.85L111.58 148.39Q111.58 145.66 112.98 143.35Q114.38 141.05 116.69 139.64Q118.99 138.24 121.73 138.24L143.76 138.24Q146.57 138.24 148.87 139.64Q151.18 141.05 152.54 143.35Q153.91 145.66 153.91 148.39L153.91 164.30L121.80 164.30L121.80 169.34Q121.80 169.49 121.94 169.63Q122.09 169.78 122.23 169.78L153.91 169.78L153.91 180L121.73 180M121.80 148.90L121.80 155.16L143.69 155.16L143.69 148.90Q143.69 148.75 143.54 148.61Q143.40 148.46 143.26 148.46L122.23 148.46Q122.09 148.46 121.94 148.61Q121.80 148.75 121.80 148.90M203.81 180L171.62 180Q168.89 180 166.55 178.60Q164.21 177.19 162.84 174.89Q161.47 172.58 161.47 169.85L161.47 153.94L193.58 153.94L193.58 148.90Q193.58 148.75 193.44 148.61Q193.30 148.46 193.15 148.46L161.47 148.46L161.47 138.24L193.66 138.24Q196.46 138.24 198.77 139.64Q201.07 141.05 202.44 143.35Q203.81 145.66 203.81 148.39L203.81 180M172.13 169.78L193.58 169.78L193.58 163.08L171.70 163.08L171.70 169.34Q171.70 169.49 171.84 169.63Q171.98 169.78 172.13 169.78M219.29 180Q216.55 180 214.25 178.60Q211.94 177.19 210.54 174.89Q209.14 172.58 209.14 169.85L209.14 148.39Q209.14 145.66 210.54 143.35Q211.94 141.05 214.25 139.64Q216.55 138.24 219.29 138.24L251.40 138.24L251.40 148.46L219.79 148.46Q219.65 148.46 219.50 148.61Q219.36 148.75 219.36 148.90L219.36 169.34Q219.36 169.49 219.50 169.63Q219.65 169.78 219.79 169.78L251.47 169.78L251.47 180L219.29 180M268.68 180Q265.94 180 263.64 178.60Q261.34 177.19 259.93 174.89Q258.53 172.58 258.53 169.85L258.53 148.39Q258.53 145.66 259.93 143.35Q261.34 141.05 263.64 139.64Q265.94 138.24 268.68 138.24L290.71 138.24Q293.52 138.24 295.82 139.64Q298.13 141.05 299.50 143.35Q300.86 145.66 300.86 148.39L300.86 169.85Q300.86 172.58 299.50 174.89Q298.13 177.19 295.82 178.60Q293.52 180 290.71 180L268.68 180M269.18 169.78L290.21 169.78Q290.35 169.78 290.50 169.63Q290.64 169.49 290.64 169.34L290.64 148.90Q290.64 148.75 290.50 148.61Q290.35 148.46 290.21 148.46L269.18 148.46Q269.04 148.46 268.90 148.61Q268.75 148.75 268.75 148.90L268.75 169.34Q268.75 169.49 268.90 169.63Q269.04 169.78 269.18 169.78M316.85 180L306.62 180L306.62 138.24L338.81 138.24Q341.62 138.24 343.92 139.64Q346.22 141.05 347.59 143.35Q348.96 145.66 348.96 148.39L348.96 180L338.74 180L338.74 148.90Q338.74 148.75 338.63 148.61Q338.52 148.46 338.30 148.46L317.28 148.46Q317.14 148.46 316.99 148.61Q316.85 148.75 316.85 148.90" fill="url(#title)"/>
+
+  <text class="lede" x="48" y="238" font-size="22" font-weight="500" letter-spacing="0" fill="#94A3B8">Offline P2P field assistant that delegates</text>
+  <text class="lede" x="48" y="268" font-size="22" font-weight="500" letter-spacing="0" fill="#94A3B8">heavy AI to a nearby laptop.</text>
+
+  <text x="48" y="322" font-size="16" fill="#F8FAFC"><tspan fill="#06b6d4">→ </tspan>P2P delegated compute via QVAC SDK</text>
+  <text x="48" y="352" font-size="16" fill="#F8FAFC"><tspan fill="#06b6d4">→ </tspan>Multimodal: photo + voice + text</text>
+  <text x="48" y="382" font-size="16" fill="#F8FAFC"><tspan fill="#06b6d4">→ </tspan>Graceful on-device fallback</text>
+  <text x="48" y="412" font-size="16" fill="#F8FAFC"><tspan fill="#06b6d4">→ </tspan>Ed25519 encrypted P2P link</text>
+  <text x="48" y="442" font-size="16" fill="#F8FAFC"><tspan fill="#06b6d4">→ </tspan>Air-gap verified (0 connections)</text>
+
+  <rect x="48" y="486" width="109" height="26" rx="13" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)"/><text x="103" y="503" font-size="12" fill="#94A3B8" text-anchor="middle">License: MIT</text>
+  <rect x="165" y="486" width="194" height="26" rx="13" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)"/><text x="262" y="503" font-size="12" fill="#94A3B8" text-anchor="middle">Built for QVAC Hackathon</text>
+  <rect x="367" y="486" width="70" height="26" rx="13" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)"/><text x="402" y="503" font-size="12" fill="#94A3B8" text-anchor="middle">Expo 56</text>
+  <rect x="445" y="486" width="105" height="26" rx="13" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)"/><text x="497" y="503" font-size="12" fill="#94A3B8" text-anchor="middle">React Native</text>
+
+  <g transform="translate(512, 0)">
+    <!-- Beacon radar pulse — the phone broadcasting over local Wi-Fi -->
+    <g fill="none" stroke="#06b6d4" stroke-width="1.5">
+      <circle cx="110" cy="280" r="8" opacity="0">
+        <animate attributeName="r" values="8;72" dur="3s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.2 0.6 0.3 1"/>
+        <animate attributeName="opacity" values="0.45;0" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="110" cy="280" r="8" opacity="0">
+        <animate attributeName="r" values="8;72" dur="3s" begin="1s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.2 0.6 0.3 1"/>
+        <animate attributeName="opacity" values="0.45;0" dur="3s" begin="1s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="110" cy="280" r="8" opacity="0">
+        <animate attributeName="r" values="8;72" dur="3s" begin="2s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.2 0.6 0.3 1"/>
+        <animate attributeName="opacity" values="0.45;0" dur="3s" begin="2s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+
+    <!-- Connections -->
+    <line x1="160" y1="280" x2="280" y2="280" stroke="rgba(255,255,255,0.1)" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <line x1="410" y1="265" x2="550" y2="200" stroke="rgba(245,158,11,0.2)" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <line x1="410" y1="305" x2="550" y2="410" stroke="rgba(34,197,94,0.2)" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <line x1="550" y1="185" x2="160" y2="265" stroke="rgba(6,182,212,0.1)" stroke-width="1" stroke-dasharray="3 5"/>
+
+    <!-- Animated dots -->
+    <circle r="4" fill="#f59e0b">
+      <animateMotion dur="2.5s" repeatCount="indefinite" calcMode="spline" keyPoints="0;1" keyTimes="0;1" keySplines="0.4 0 0.2 1">
+        <mpath href="#p1"/>
+      </animateMotion>
+    </circle>
+    <path id="p1" d="M 160 280 L 280 280 L 410 265 L 550 200" fill="none" stroke="none"/>
+
+    <circle r="3" fill="#22c55e" opacity="0.6">
+      <animateMotion dur="3s" repeatCount="indefinite" calcMode="spline" keyPoints="0;1" keyTimes="0;1" keySplines="0.4 0 0.2 1">
+        <mpath href="#p2"/>
+      </animateMotion>
+    </circle>
+    <path id="p2" d="M 160 280 L 280 280 L 410 305 L 550 410" fill="none" stroke="none"/>
+
+    <circle r="3" fill="#06b6d4" opacity="0.6">
+      <animateMotion dur="2.8s" repeatCount="indefinite" calcMode="spline" keyPoints="0;1" keyTimes="0;1" keySplines="0.4 0 0.2 1" path="M 550 185 L 160 265" />
+    </circle>
+
+    <!-- Nodes -->
+    <!-- Phone -->
+    <rect x="60" y="200" width="100" height="160" rx="14" fill="#0a0a0a" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+    <rect x="80" y="215" width="60" height="6" rx="3" fill="rgba(255,255,255,0.15)"/>
+    <circle cx="110" cy="340" r="6" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+    <text x="110" y="385" font-size="12px" fill="#94A3B8" text-anchor="middle">Phone</text>
+    <text x="110" y="400" font-size="10px" fill="#475569" text-anchor="middle">Capture</text>
+
+    <!-- Router -->
+    <rect x="280" y="250" width="130" height="80" rx="16" fill="#0a0a0a" stroke="#06b6d4" stroke-width="1.5">
+      <animate attributeName="stroke-width" values="1.5;2.6;1.5" dur="2.5s" repeatCount="indefinite"/>
+    </rect>
+    <text x="345" y="290" font-size="12px" fill="#06b6d4" text-anchor="middle">shouldDelegate()</text>
+    <text x="345" y="308" font-size="10px" fill="#475569" text-anchor="middle">complexity · peer</text>
+
+    <!-- Laptop -->
+    <rect x="550" y="140" width="140" height="100" rx="10" fill="#0a0a0a" stroke="rgba(245,158,11,0.3)" stroke-width="1.5"/>
+    <rect x="565" y="155" width="110" height="60" rx="4" fill="rgba(245,158,11,0.04)"/>
+    <rect x="540" y="230" width="160" height="6" rx="3" fill="rgba(245,158,11,0.15)"/>
+    <text x="620" y="265" font-size="12px" fill="#f59e0b" text-anchor="middle">Laptop Provider</text>
+    <text x="620" y="280" font-size="10px" fill="#475569" text-anchor="middle">Heavy Model</text>
+
+    <!-- Local -->
+    <rect x="550" y="380" width="140" height="70" rx="10" fill="#0a0a0a" stroke="rgba(34,197,94,0.3)" stroke-width="1.5"/>
+    <text x="620" y="415" font-size="12px" fill="#22c55e" text-anchor="middle">On-Device</text>
+    <text x="620" y="432" font-size="10px" fill="#475569" text-anchor="middle">Small Model</text>
+
+    <!-- Labels on paths -->
+    <text x="470" y="218" font-size="10px" fill="#f59e0b" transform="rotate(-18, 470, 218)">delegate</text>
+    <text x="470" y="375" font-size="10px" fill="#22c55e" transform="rotate(18, 470, 375)">fallback</text>
+
+    <!-- Response Label (aligned along the cyan return path) -->
+    <text x="338" y="232" font-size="9px" fill="#06b6d4" opacity="0.55" transform="rotate(-12, 338, 232)">← response</text>
+
+    <!-- Badges -->
+    <!-- Wi-Fi Direct badge -->
+    <rect x="300" y="470" width="120" height="28" rx="14" fill="rgba(6,182,212,0.08)" stroke="rgba(6,182,212,0.2)" stroke-width="1"/>
+    <text x="360" y="489" font-size="11px" fill="#06b6d4" text-anchor="middle">Wi-Fi Direct</text>
+
+    <!-- Latency badge -->
+    <rect x="460" y="470" width="90" height="28" rx="14" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+    <text x="505" y="489" font-size="11px" fill="#f59e0b" text-anchor="middle">~120ms</text>
+
+    <!-- Air-gap badge -->
+    <rect x="580" y="470" width="100" height="28" rx="14" fill="rgba(34,197,94,0.08)" stroke="rgba(34,197,94,0.2)" stroke-width="1"/>
+    <text x="630" y="489" font-size="11px" fill="#22c55e" text-anchor="middle">Air-Gapped</text>
+  </g>
+</svg>

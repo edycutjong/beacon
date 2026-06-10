@@ -23,6 +23,9 @@ web-build/
 /blob-report/
 /playwright/.cache/
 
+# Lighthouse
+.lighthouseci/
+
 # Coverage
 coverage/
 

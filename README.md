@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="docs/readme-hero.svg" alt="Beacon — offline P2P field assistant that delegates heavy AI inference from a phone to a nearby laptop over an encrypted local link" width="100%">
+</div>
+
+---
+
 ## 🧑‍⚖️ For Judges — Review in 5 Steps
 
 > Offline P2P field assistant on `@qvac/sdk`: a phone delegates heavy inference to a nearby laptop over local Wi-Fi — **no internet, no cloud.**
@@ -11,7 +17,7 @@
    ```
    Pair phone → laptop, send a heavy query → topology shows **DELEGATED → laptop**; stop the provider → it **auto-falls back** to the on-device model (badge flips to LOCAL).
 3. **Verify offline:** `python3 scripts/verify_offline.py` (unplug Wi-Fi first) — scans for banned cloud-SDK imports + asserts network isolation.
-4. **Tests & metrics:** `npm run ci` — typecheck + **37 unit tests** (routing decisions, Ed25519 pairing, fallback, on-device audit log). `python3 scripts/bench.py` — local-vs-delegated latency + fallback-switch budgets.
+4. **Tests & metrics:** `npm run ci` — typecheck + **100+ unit tests** (routing decisions, Ed25519 pairing, fallback, on-device audit log). `python3 scripts/bench.py` — local-vs-delegated latency + fallback-switch budgets.
 5. **No remote APIs** ([docs/REMOTE_APIS.md](docs/REMOTE_APIS.md)) — all inference is local via `@qvac/sdk`; the P2P link stays on local Wi-Fi and never touches the internet.
 
 > ℹ️ This is a prototype: the provider daemon and on-device models run in a demo/simulated mode (see [Honest Limitations](#️-honest-limitations)). The routing/fallback logic and the offline guarantee are real and unit-tested.
@@ -19,14 +25,15 @@
 ---
 
 <div align="center">
-  <img src="docs/icon.svg" alt="Beacon" width="120" height="120">
+  <img src="docs/icon.svg" alt="Beacon" width="140" height="140">
 
   <h1>Beacon 📡</h1>
   <p><em>Offline P2P field assistant — delegates heavy AI inference from a phone to a nearby laptop via QVAC's peer-to-peer compute mesh. No cloud, no internet, just local Wi-Fi Direct.</em></p>
 
 
   [![Built for QVAC Hackathon](https://img.shields.io/badge/DoraHacks-QVAC%20Edge%20AI-8b5cf6?style=for-the-badge)](https://dorahacks.io)
-  [![Track](https://img.shields.io/badge/Track-Mobile-06b6d4?style=for-the-badge)](https://dorahacks.io)
+  [![Track](https://img.shields.io/badge/Track-Mobile-06b6d4?style=for-the-badge)](https://dorahacks.io/hackathon/qvac-unleach-edge-ai-i/tracks/#mobile)
+  [![Track](https://img.shields.io/badge/Track-Psy_Models_(MedPsy)-ef4444?style=for-the-badge)](https://dorahacks.io/hackathon/qvac-unleach-edge-ai-i/tracks/#psy-models-medpsy)
 
   <br/>
 
@@ -49,25 +56,43 @@ In field conditions — disaster zones, remote construction sites, wilderness �
 **Key Features:**
 - 📡 **P2P Delegation** — Heavy queries offloaded to laptop via Wi-Fi Direct
 - 🔄 **Auto Fallback** — If peer drops, routes to on-device small model instantly
+- 🩺 **MedPsy Domain Routing** — Medical queries route to QVAC's specialized `MedPsy-1.7B` model
+- 📑 **Offline RAG Citations** — Answers are grounded in a bundled field manual via local `ragSearch`
 - 🔐 **Ed25519 Pairing** — Secure peer authentication without cloud PKI
 - 📊 **Topology Indicator** — Shows "LOCAL" vs "DELEGATED → Laptop-01"
 - 🔇 **100% Offline** — No internet required, ever
 
 ## 🏗️ Architecture & Tech Stack
 
-```
-[Phone App] ←── Wi-Fi Direct ──→ [Laptop Provider]
-     ↓                                    ↓
-  @qvac/sdk                         @qvac/sdk
-  (small model)                    (large model)
-     ↓                                    ↓
-  Local fallback              Heavy inference (delegate)
+```mermaid
+graph TD
+    classDef phone fill:#06b6d4,stroke:#0891b2,stroke-width:2px,color:#fff,rx:8,ry:8;
+    classDef laptop fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff,rx:8,ry:8;
+    classDef sdk fill:#1e293b,stroke:#334155,stroke-width:1px,color:#cbd5e1,rx:5,ry:5;
+    classDef fallback fill:#22c55e,stroke:#16a34a,stroke-width:2px,color:#fff,rx:5,ry:5;
+    classDef heavy fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff,rx:5,ry:5;
+
+    Phone["📱 Phone App"]:::phone
+    Laptop["💻 Laptop Provider"]:::laptop
+    
+    QvacSmall["@qvac/sdk<br/>(small model)"]:::sdk
+    QvacLarge["@qvac/sdk<br/>(large model)"]:::sdk
+    
+    LocalFallback["🟢 Local fallback"]:::fallback
+    HeavyInference["🟡 Heavy inference<br/>(delegate)"]:::heavy
+
+    Phone <-->|"Wi-Fi Direct"| Laptop
+    Phone --> QvacSmall
+    Laptop --> QvacLarge
+    QvacSmall --> LocalFallback
+    QvacLarge --> HeavyInference
 ```
 
 | Layer | Technology |
 |---|---|
 | **Mobile App** | Expo 56, React Native 0.85, React 19 |
 | **AI Engine** | @qvac/sdk (completion, RAG, TTS, P2P) |
+| **Models** | Llama-3.2-1B (general), MedPsy-1.7B (medical triage) |
 | **Provider** | Node.js daemon (laptop-side) |
 
 ## 🏆 Why ONLY QVAC?
@@ -122,7 +147,7 @@ Run `python3 scripts/bench.py` to reproduce. Results on iPhone 15 + MacBook Pro 
 
 ## 🧪 Testing & CI
 
-**37 unit tests (Vitest)** covering the local-vs-delegate router, Ed25519 P2P pairing, the auto-fallback path, and the on-device audit log (model loads/unloads · TTFT · tokens/sec), plus **3 E2E suites (Playwright)** and the offline-verification checks.
+**100+ unit tests (Vitest)** covering the local-vs-delegate router, Ed25519 P2P pairing, the auto-fallback path, and the on-device audit log (model loads/unloads · TTFT · tokens/sec), plus **3 E2E suites (Playwright)** and the offline-verification checks.
 
 ## 🔍 Verification & Compliance
 
@@ -130,25 +155,31 @@ Run `python3 scripts/bench.py` to reproduce. Results on iPhone 15 + MacBook Pro 
 |---|---|---|
 | **No remote APIs** — zero cloud | [`docs/REMOTE_APIS.md`](docs/REMOTE_APIS.md) | `python3 scripts/verify_offline.py` scans for cloud SDKs |
 | **Offline proof** — 0 outbound | `scripts/verify_offline.py` | unplug Wi-Fi, then run |
-| **Tests** | `npm run ci` · `npx playwright test` | 37 unit + 3 E2E |
+| **Tests** | `npm run ci` · `npx playwright test` | 100+ unit + 3 E2E |
 | **Benchmarks** | `scripts/bench.py` | ⚠️ simulated — re-run on phone+laptop for real numbers |
 | **Audit log** (model loads/unloads · TTFT/tokens/sec) | `src/core/audit.ts` | ✅ auto-captured on every inference; shown in-app + `getAuditSummary()` |
 
-**5-stage pipeline:** Quality → Security → Build → Offline Verify → Deploy
+**7-stage pipeline:** Quality → Security → Build → E2E → Performance → Offline Verify → Deploy
 
 ```bash
 # ── Evidence Bundle ─────────────────────────
 python3 scripts/verify_offline.py
 python3 scripts/bench.py
 python3 scripts/check_submission_readiness.py
+
+# ── Advanced Testing ────────────────────────
+npm run e2e            # Playwright E2E tests
+npm run lighthouse     # Lighthouse CI audit
 ```
 
 | Layer | Tool | Status |
 |---|---|---|
 | Code Quality | TypeScript strict | ✅ |
+| E2E Testing | Playwright (3 suites) | ✅ |
 | Security (SAST) | CodeQL | ✅ |
 | Security (SCA) | Dependabot + npm audit | ✅ |
 | Secret Scanning | TruffleHog | ✅ |
+| Performance | Lighthouse CI | ✅ |
 | Offline Verification | verify_offline.py | ✅ |
 
 ## 📁 Project Structure
@@ -159,6 +190,9 @@ beacon/
 ├── scripts/            # seed, bench, verify, readiness
 ├── src/
 │   ├── core/
+│   │   ├── domain.ts   # Medical-query classifier
+│   │   ├── manual.ts   # Bundled offline field manual (RAG corpus)
+│   │   ├── rag.ts      # ragSearch + lexical fallback
 │   │   ├── qvac.ts     # @qvac/sdk wrapper
 │   │   ├── p2p.ts      # P2P host/pair lifecycle
 │   │   └── router.ts   # Local vs delegate routing
