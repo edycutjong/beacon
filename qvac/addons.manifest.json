@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "bundleId": "c118535208719ea337b7b7037577ec882dedea3d21f0e2dc428ce88ce489f34e",
+  "bundleId": "274d8d7a66b3916a0a126ad7c70d6c490a8b259c79cb7ac3f91106e4efa9dd16",
   "addons": [
     "@qvac/diffusion-cpp",
     "@qvac/embed-llamacpp",
@@ -10,7 +10,7 @@
     "@qvac/transcription-parakeet",
     "@qvac/transcription-whispercpp",
     "@qvac/translation-nmtcpp",
-    "@qvac/tts-ggml",
+    "@qvac/tts-onnx",
     "bare-abort",
     "bare-buffer",
     "bare-crypto",
