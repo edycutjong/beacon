@@ -11,7 +11,7 @@ import {
   GTE_LARGE_FP16,
   TTS_EN_SUPERTONIC_Q8_0,
 } from "@qvac/sdk";
-import { recordModelLoad, recordModelUnload, recordCompletion, estimateTokens } from "./audit";
+import { recordModelLoad, recordModelUnload, recordCompletion, estimateTokens } from "./audit.ts";
 
 // Define custom constants or fallbacks
 export const MEDPSY_MODEL_ID = "MedPsy-1.7B"; // Default name for MedPsy-1.7B

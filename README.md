@@ -1,9 +1,3 @@
-<div align="center">
-  <img src="docs/readme-hero.svg" alt="Beacon — offline P2P field assistant that delegates heavy AI inference from a phone to a nearby laptop over an encrypted local link" width="100%">
-</div>
-
----
-
 ## 🧑‍⚖️ For Judges — Review in 5 Steps
 
 > Offline P2P field assistant on `@qvac/sdk`: a phone delegates heavy inference to a nearby laptop over local Wi-Fi — **no internet, no cloud.**
@@ -12,7 +6,7 @@
 2. **Run it** (Expo app + laptop provider):
    ```bash
    npm install && python3 scripts/seed.py
-   node src/node/provider.ts     # laptop-side provider (hosts the large model)
+   npm run provider              # laptop-side provider (hosts the large model)
    npx expo start                # phone app — Expo Go / simulator
    ```
    Pair phone → laptop, send a heavy query → topology shows **DELEGATED → laptop**; stop the provider → it **auto-falls back** to the on-device model (badge flips to LOCAL).
@@ -29,6 +23,7 @@
 
   <h1>Beacon 📡</h1>
   <p><em>Offline P2P field assistant — delegates heavy AI inference from a phone to a nearby laptop via QVAC's peer-to-peer compute mesh. No cloud, no internet, just local Wi-Fi Direct.</em></p>
+  <img src="docs/readme-hero.svg" alt="Beacon — offline P2P field assistant that delegates heavy AI inference from a phone to a nearby laptop over an encrypted local link" width="100%">
 
 
   [![Built for QVAC Hackathon](https://img.shields.io/badge/DoraHacks-QVAC%20Edge%20AI-8b5cf6?style=for-the-badge)](https://dorahacks.io)

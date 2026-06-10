@@ -7,12 +7,12 @@ import {
   pairWithProvider,
   getPairedProviderKey,
   clearPairing,
-} from "../p2p";
+} from "../p2p.ts";
 
 import {
   shouldDelegate,
   runRoute,
-} from "../router";
+} from "../router.ts";
 
 import {
   loadLLMModel,
@@ -25,7 +25,7 @@ import {
   runTextToSpeech,
   startP2PProvider,
   stopP2PProvider,
-} from "../qvac";
+} from "../qvac.ts";
 
 import {
   estimateTokens,
@@ -36,11 +36,11 @@ import {
   clearAuditLog,
   getAuditSummary,
   setAuditSink,
-} from "../audit";
-import * as audit from "../audit";
+} from "../audit.ts";
+import * as audit from "../audit.ts";
 
-import { classifyDomain, domainLabel } from "../domain";
-import { lexicalSearch, retrieveCitations } from "../rag";
+import { classifyDomain, domainLabel } from "../domain.ts";
+import { lexicalSearch, retrieveCitations } from "../rag.ts";
 
 // Mock @qvac/sdk
 const mockLoadModel = vi.fn();

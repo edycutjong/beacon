@@ -7,8 +7,8 @@
 // work air-gapped before an embedding index is built — mirroring Beacon's
 // "graceful degradation" ethos elsewhere in the stack.
 
-import { runRagSearch } from "./qvac";
-import { FIELD_MANUAL, type ManualEntry } from "./manual";
+import { runRagSearch } from "./qvac.ts";
+import { FIELD_MANUAL, type ManualEntry } from "./manual.ts";
 
 export interface Citation {
   id: string;

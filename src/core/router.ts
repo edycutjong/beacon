@@ -1,8 +1,8 @@
-import { loadLLMModel, runCompletion, unloadQVACModel, LLAMA_MODEL_ID, MEDPSY_MODEL_ID } from "./qvac";
-import { getPairedProviderKey } from "./p2p";
-import { getAuditLog } from "./audit";
-import { classifyDomain, type Domain } from "./domain";
-import { retrieveCitations, type Citation } from "./rag";
+import { loadLLMModel, runCompletion, unloadQVACModel, LLAMA_MODEL_ID, MEDPSY_MODEL_ID } from "./qvac.ts";
+import { getPairedProviderKey } from "./p2p.ts";
+import { getAuditLog } from "./audit.ts";
+import { classifyDomain, type Domain } from "./domain.ts";
+import { retrieveCitations, type Citation } from "./rag.ts";
 
 export interface RouteResult {
   text: string;
