@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@qvac/sdk": "^0.10.2",
+    "@qvac/sdk": "^0.12.2",
     "expo": "^56.0.9",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",
