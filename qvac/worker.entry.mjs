@@ -7,8 +7,8 @@
 *   - @qvac/sdk/llamacpp-embedding/plugin
 *   - @qvac/sdk/whispercpp-transcription/plugin
 *   - @qvac/sdk/parakeet-transcription/plugin
-*   - @qvac/sdk/nmtcpp-translation/plugin
-*   - @qvac/sdk/tts-ggml/plugin
+ *   - @qvac/sdk/nmtcpp-translation/plugin
+ *   - @qvac/sdk/onnx-tts/plugin
 *   - @qvac/sdk/onnx-ocr/plugin
 *   - @qvac/sdk/sdcpp-generation/plugin
  */
@@ -22,7 +22,7 @@ import { embeddingsPlugin } from "@qvac/sdk/llamacpp-embedding/plugin";
 import { whisperPlugin } from "@qvac/sdk/whispercpp-transcription/plugin";
 import { parakeetPlugin } from "@qvac/sdk/parakeet-transcription/plugin";
 import { nmtPlugin } from "@qvac/sdk/nmtcpp-translation/plugin";
-import { ttsPlugin } from "@qvac/sdk/tts-ggml/plugin";
+import { ttsPlugin } from "@qvac/sdk/onnx-tts/plugin";
 import { ocrPlugin } from "@qvac/sdk/onnx-ocr/plugin";
 import { diffusionPlugin } from "@qvac/sdk/sdcpp-generation/plugin";
 
