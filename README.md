@@ -14,7 +14,7 @@
 4. **Tests & metrics:** `make ci` — lint + typecheck + **259 unit tests at 100% coverage** (routing decisions, multimodal vision routing, Ed25519 pairing, QR/NFC/deeplink key parsing, fallback, on-device audit log, UI components). `make bench` — local-vs-delegated latency + fallback-switch budgets.
 5. **No remote APIs** ([docs/REMOTE_APIS.md](docs/REMOTE_APIS.md)) — all inference is local via `@qvac/sdk`; the P2P link stays on local Wi-Fi and never touches the internet.
 
-> ℹ️ **Real vs. simulated, up front:** the routing/fallback engine, Ed25519 pairing, offline RAG, the audit log, and the **100%-offline guarantee** are real and exhaustively unit-tested (259 tests, 100% coverage). What we haven't captured on hardware is a full *live delegated-inference token stream* end-to-end — the `@qvac/sdk` integration is written to the documented API, and the benchmark timings below are simulated until re-run on a device. Full breakdown: [**Proof Status — Real vs. Simulated**](#-proof-status--real-vs-simulated). We'd rather state that plainly than stage a fake screenshot.
+> ℹ️ **Real vs. simulated, up front:** the routing/fallback engine, Ed25519 pairing, offline RAG, the audit log, the **100%-offline guarantee**, and a **real delegated-inference token stream** over QVAC's P2P/DHT are all real and verifiable — 259 unit tests at 100% coverage, *plus* `node scripts/verify_delegation.mjs`, which delegates a live completion between two `@qvac/sdk` peers with on-device fallback **disabled** (transcript in [`docs/evidence/`](docs/evidence/delegated-inference.md)). What's still pending real hardware is that same flow on a **physical phone ↔ laptop over Wi-Fi** and the device-side timings below. Full breakdown: [**Proof Status — Real vs. Simulated**](#-proof-status--real-vs-simulated). We'd rather state that plainly than stage a fake screenshot.
 
 ---
 
@@ -223,7 +223,8 @@ beacon/
 | On-device audit log (TTFT · tok/s · load/unload) | ✅ Real · auto-captured | `audit.ts` |
 | **100%-offline guarantee** (zero cloud SDKs) | ✅ Real · verifiable | `scripts/verify_offline.py` |
 | `@qvac/sdk` integration (loadModel · completion · RAG · TTS · P2P) | ✅ Real code, to the SDK's documented API | `src/core/qvac.ts` |
-| Full **live delegated-inference token stream** on a physical phone ↔ laptop | 🔶 Wiring in place; not yet captured on hardware | needs a device + running provider daemon |
+| **Delegated-inference token stream** (`loadModel` → provider → `completion`) over QVAC P2P/DHT | ✅ Real · reproducible | `node scripts/verify_delegation.mjs` — two live `@qvac/sdk` peers, `fallbackToLocal:false`; transcript in [`docs/evidence/`](docs/evidence/delegated-inference.md) |
+| Same flow on a **physical phone ↔ laptop over Wi-Fi** (+ real device timings) | 🔶 Pending hardware | pipeline proven on one host (loopback DHT); needs a device build to capture phone-side transport/latency |
 | Benchmark timings (TTFT · tok/s · RAM) | 🔶 Simulated placeholders | re-run `scripts/bench.py` on-device for real numbers |
 | Web preview (Playwright E2E) | 🔶 Uses a mock `@qvac/sdk` shim | the native bare-kit worker can't run in a browser — **the mobile app loads the real SDK**; `metro.config.js` aliases the mock for `web` only |
 
