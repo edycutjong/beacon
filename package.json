@@ -20,7 +20,7 @@
   "devDependencies": {
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.52.0",
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.9.3",
     "@types/qrcode-terminal": "^0.12.2",
     "@types/react": "~19.2.2",
     "@vitest/coverage-v8": "^4.1.8",
