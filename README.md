@@ -1,5 +1,3 @@
-# 🚨 Beacon: Privacy-First AI Mesh for Austere Environments
-
 ## 🧑‍⚖️ For Judges — Review in 5 Steps
 
 > Offline P2P field assistant on `@qvac/sdk`: delegates heavy AI inference from a phone to a nearby laptop via QVAC's peer-to-peer compute mesh. No cloud, no internet, just local Wi-Fi Direct.
@@ -22,13 +20,11 @@
 ---
 
 <div align="center">
-  <h2><a href="https://youtu.be/148A6cm2VDM">▶️ WATCH THE 90-SECOND DEMO VIDEO HERE</a></h2>
-</div>
+  <img src="docs/icon.svg" alt="Beacon" width="120" height="120">
 
-<div align="center">
-  <img src="docs/icon.svg" alt="Beacon" width="140" height="140">
+  <h1>Beacon 📡</h1>
   <p><em>Offline P2P field assistant — delegates heavy AI inference from a phone to a nearby laptop via QVAC's peer-to-peer compute mesh. No cloud, no internet, just local Wi-Fi Direct.</em></p>
-  <img src="docs/readme-hero.svg" alt="Beacon — offline P2P field assistant" width="100%">
+  <img src="docs/readme-hero.svg" alt="Beacon: Privacy-First AI Mesh for Austere Environments" width="100%">
 
   [![Built for QVAC Hackathon](https://img.shields.io/badge/DoraHacks-QVAC%20Edge%20AI-8b5cf6?style=for-the-badge)](https://dorahacks.io)
   [![Track](https://img.shields.io/badge/Track-Mobile-06b6d4?style=for-the-badge)](https://dorahacks.io/hackathon/qvac-unleach-edge-ai-i/tracks/#mobile)
