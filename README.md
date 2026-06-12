@@ -28,9 +28,9 @@
 
   [![Built for QVAC Hackathon](https://img.shields.io/badge/DoraHacks-QVAC%20Edge%20AI-8b5cf6?style=for-the-badge)](https://dorahacks.io)
   [![Track](https://img.shields.io/badge/Track-Mobile-06b6d4?style=for-the-badge)](https://dorahacks.io/hackathon/qvac-unleach-edge-ai-i/tracks/#mobile)
-  [![Download APK](https://img.shields.io/badge/Download-APK%20(Latest_Build)-22c55e?style=for-the-badge&logo=android)](https://nightly.link/edycutjong/beacon/workflows/ci/main/beacon-release-apk.zip)
-  [![Track](https://img.shields.io/badge/Track-Psy_Models_(MedPsy)-ef4444?style=for-the-badge)](https://dorahacks.io/hackathon/qvac-unleach-edge-ai-i/tracks/#psy-models-medpsy)
   [![Demo Video](https://img.shields.io/badge/Demo-Video_YouTube-FF0000?style=for-the-badge&logo=youtube)](https://youtu.be/148A6cm2VDM)
+  [![Track](https://img.shields.io/badge/Track-Psy_Models_(MedPsy)-ef4444?style=for-the-badge)](https://dorahacks.io/hackathon/qvac-unleach-edge-ai-i/tracks/#psy-models-medpsy)
+  [![Download APK](https://img.shields.io/badge/Download-APK%20(Latest_Build)-22c55e?style=for-the-badge&logo=android)](https://nightly.link/edycutjong/beacon/workflows/ci/main/beacon-release-apk.zip)
 
   <br/>
 
@@ -61,6 +61,19 @@ In field conditions — disaster zones, remote construction sites, wilderness �
 - 🔐 **Ed25519 Pairing** — Secure peer authentication without cloud PKI
 - 📊 **Topology Indicator** — Shows "LOCAL" vs "DELEGATED → Laptop-01", with a P2P host status (INACTIVE → SYNCING → ACTIVE)
 - 🔇 **100% Offline** — No internet required, ever
+
+## 📸 Screenshots
+
+<div align="center">
+  <img src="docs/screenshots/01-pairing-qr.png" width="32%" alt="QR Pairing" />
+  <img src="docs/screenshots/02-delegating.png" width="32%" alt="Delegating Inference" />
+  <img src="docs/screenshots/03-voice-query.png" width="32%" alt="Voice Query" />
+  <br/>
+  <br/>
+  <img src="docs/screenshots/04-photo-analysis.png" width="32%" alt="Multimodal Photo Analysis" />
+  <img src="docs/screenshots/05-citations.png" width="32%" alt="RAG Citations" />
+  <img src="docs/screenshots/07-fallback-local.png" width="32%" alt="Local Fallback" />
+</div>
 
 ## 🏗️ Architecture & Tech Stack
 
