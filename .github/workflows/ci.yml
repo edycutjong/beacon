@@ -115,7 +115,7 @@ jobs:
           NODE_ENV: production
       - name: Upload E2E artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
@@ -191,7 +191,7 @@ jobs:
       - name: Build APK
         run: cd android && ./gradlew assembleRelease
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: beacon-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
