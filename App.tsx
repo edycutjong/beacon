@@ -369,23 +369,32 @@ export default function App() {
                   textAlignVertical="top"
                 />
 
-                {/* Hands-free voice input — Whisper STT on-device */}
-                {voiceSupported && (
-                  <TouchableOpacity
-                    style={[s.voiceBtn, recording && s.voiceBtnActive, transcribing && { opacity: 0.6 }]}
-                    onPress={handleMic}
-                    disabled={transcribing}
-                  >
-                    <Text style={[s.voiceIcon, recording && { color: C.red }]}>{recording ? '⏹' : '🎙'}</Text>
-                    <Text style={[s.voiceText, recording && { color: C.red }]}>
-                      {transcribing ? 'TRANSCRIBING…' : recording ? 'TAP TO STOP · RECORDING' : 'DICTATE QUERY'}
-                    </Text>
-                    {recording && <View style={s.recDot} />}
-                  </TouchableOpacity>
-                )}
+                {/* Action Row: Voice & Image Attachment */}
+                <View style={s.actionRow}>
+                  {voiceSupported && (
+                    <TouchableOpacity
+                      style={[s.voiceBtn, s.actionBtn, recording && s.voiceBtnActive, transcribing && { opacity: 0.6 }]}
+                      onPress={handleMic}
+                      disabled={transcribing}
+                    >
+                      <Text style={[s.voiceIcon, recording && { color: C.red }]}>{recording ? '⏹' : '🎙'}</Text>
+                      <Text style={[s.voiceText, s.actionBtnText, recording && { color: C.red }]} numberOfLines={1} adjustsFontSizeToFit>
+                        {transcribing ? 'TRANSCRIBING…' : recording ? 'RECORDING' : 'DICTATE'}
+                      </Text>
+                      {recording && <View style={s.recDot} />}
+                    </TouchableOpacity>
+                  )}
 
-                {/* Multimodal attachment — heavy vision pass delegates to the peer */}
-                {imageUri ? (
+                  {!imageUri && (
+                    <TouchableOpacity style={[s.attachBtn, s.actionBtn]} onPress={() => setCaptureOpen(true)}>
+                      <Text style={s.attachIcon}>📷</Text>
+                      <Text style={[s.attachBtnText, s.actionBtnText]} numberOfLines={1} adjustsFontSizeToFit>ATTACH PHOTO</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Selected Image Thumbnail */}
+                {imageUri && (
                   <View style={s.attachRow}>
                     <Image source={{ uri: imageUri }} style={s.attachThumb} />
                     <View style={{ flex: 1 }}>
@@ -396,11 +405,6 @@ export default function App() {
                       <Text style={s.attachRemove}>✕</Text>
                     </TouchableOpacity>
                   </View>
-                ) : (
-                  <TouchableOpacity style={s.attachBtn} onPress={() => setCaptureOpen(true)}>
-                    <Text style={s.attachIcon}>📷</Text>
-                    <Text style={s.attachBtnText}>ATTACH FIELD PHOTO</Text>
-                  </TouchableOpacity>
                 )}
 
                 <TouchableOpacity
@@ -635,6 +639,10 @@ const s = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   quickChip: { borderWidth: 1, borderColor: '#334155', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.3)' },
   quickChipText: { fontSize: 11, color: C.text2, fontWeight: '600' },
+
+  actionRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  actionBtn: { flex: 1, marginBottom: 0, paddingVertical: 14, gap: 6 },
+  actionBtnText: { fontSize: 11, letterSpacing: 1 },
 
   attachBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: `${C.cyan}45`, borderStyle: 'dashed', borderRadius: 8, paddingVertical: 12, marginBottom: 16, backgroundColor: `${C.cyan}08` },
   attachIcon: { fontSize: 16 },
