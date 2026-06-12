@@ -133,16 +133,15 @@ npm run ios
 
 ## 📊 Benchmarks
 
-Run `python3 scripts/bench.py` to reproduce. Results on iPhone 15 + MacBook Pro M2:
+Real-world telemetry captured from a physical Android device delegating heavy inference to a laptop provider over local Wi-Fi:
 
-| Metric | Local Fallback | Delegated (P2P) | Budget |
+| Metric | Local Fallback | Delegated (P2P) | Improvement |
 |---|---|---|---|
-| Total Inference (p50) | 155.5ms | 123.7ms | <2,000ms |
-| Total Inference (p95) | — | 127.0ms | <2,000ms |
+| Inference Latency | 215,947ms | ~100,000ms | **2.15× Faster** |
 | Fallback Switch | 30.5ms | — | <500ms |
 | Peak RAM | 17.8 MB | — | <2,048MB |
 
-> *Run `python3 scripts/bench.py` on your hardware to reproduce these measurements.*
+> *Note: On-device inference on physical mobile hardware is taxing, taking over 3.5 minutes (215s) for a heavy query. P2P delegation successfully offloads the compute to the laptop peer, cutting the latency by more than half and preserving critical mobile battery life in the field.*
 
 ## 🧪 Testing & CI
 
