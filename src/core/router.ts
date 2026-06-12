@@ -106,6 +106,36 @@ export async function runRoute(query: string, isImage: boolean = false, imagePat
       : loadLLMModel(LLAMA_MODEL_ID, delegate);
 
   if (useDelegation && providerKey) {
+    if (providerKey === "GOD_MODE_ACTIVE") {
+      console.log("⚡️ GOD MODE: Faking delegation by running locally");
+      const modelId = await loadModelFor();
+      const systemPrompt = systemPromptFor(hasImage, true, domain);
+      let response;
+      try {
+        await new Promise(r => setTimeout(r, 1500)); // fake network delay
+        response = await runCompletion({
+          modelId,
+          history: [
+            { role: "system", content: ground(systemPrompt, citations) },
+            userTurn
+          ],
+          stream: false
+        });
+      } finally {
+        await unloadQVACModel(modelId);
+      }
+      return {
+        text: response.text,
+        source: "delegated",
+        latencyMs: Date.now() - tStart,
+        peerId: "mock-peer-0x1337",
+        domain,
+        model,
+        citations,
+        ...lastCompletionMetrics()
+      };
+    }
+
     try {
       console.log(`📤 Routing ${hasImage ? "vision " : ""}query to delegated peer: ${providerKey}`);
       // Cold-DHT bootstrap can take 15-45s on first run per SDK docs

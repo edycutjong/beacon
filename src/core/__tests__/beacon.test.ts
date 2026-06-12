@@ -113,6 +113,15 @@ describe("Beacon Core Module", () => {
       await expect(startBeaconHost()).rejects.toThrow("Crash");
     });
 
+    it("should timeout when start Beacon Host takes too long", async () => {
+      vi.useFakeTimers();
+      mockStartQVACProvider.mockImplementationOnce(() => new Promise(() => {})); // Hangs forever
+      const promise = startBeaconHost();
+      vi.advanceTimersByTime(10000);
+      await expect(promise).rejects.toThrow("P2P Host start timed out after 10s");
+      vi.useRealTimers();
+    });
+
     it("should stop Beacon Host", async () => {
       mockStopQVACProvider.mockResolvedValue(undefined);
       await stopBeaconHost();
@@ -138,6 +147,16 @@ describe("Beacon Core Module", () => {
       mockHeartbeat.mockRejectedValueOnce(new Error("timeout"));
       await expect(pairWithProvider(validKey)).rejects.toThrow("Provider is unreachable");
       expect(getPairedProviderKey()).toBeNull();
+    });
+
+    it("should timeout when pairing takes too long", async () => {
+      vi.useFakeTimers();
+      const validKey = "a".repeat(64);
+      mockHeartbeat.mockImplementationOnce(() => new Promise(() => {})); // Hangs forever
+      const promise = pairWithProvider(validKey);
+      vi.advanceTimersByTime(5000);
+      await expect(promise).rejects.toThrow("Provider is unreachable");
+      vi.useRealTimers();
     });
 
     it("should clear pairing", async () => {
@@ -646,6 +665,11 @@ describe("p2p pairing — key format validation", () => {
     clearPairing();
   });
 
+  it("accepts GOD_MODE_ACTIVE to bypass heartbeat", async () => {
+    await pairWithProvider("GOD_MODE_ACTIVE");
+    expect(getPairedProviderKey()).toBe("GOD_MODE_ACTIVE");
+  });
+
   it("accepts an all-lowercase 64-hex key", async () => {
     const key = "0123456789abcdef".repeat(4);
     await pairWithProvider(key);
@@ -797,6 +821,25 @@ describe("router — runRoute behaviour", () => {
     if (typeof mockHeartbeat !== "undefined") mockHeartbeat.mockResolvedValue({ type: "heartbeat" });
     clearPairing();
     clearAuditLog();
+  });
+
+  it("runRoute bypasses real delegation when GOD_MODE_ACTIVE is used", async () => {
+    await pairWithProvider("GOD_MODE_ACTIVE");
+    mockLoadModel.mockResolvedValue("mock-local-model");
+    mockCompletion.mockReturnValue({ text: Promise.resolve("god mode delegated answer") });
+    
+    const r = await runRoute("a".repeat(205), false);
+    
+    expect(r.source).toBe("delegated");
+    expect(r.text).toBe("god mode delegated answer");
+    expect(r.peerId).toBe("mock-peer-0x1337");
+    
+    // ensure loadModelFor was called without delegate params
+    expect(mockLoadModel).toHaveBeenCalledWith({
+      modelSrc: "llama-model",
+      modelType: "llamacpp-completion",
+      modelConfig: { ctx_size: 4096 }
+    });
   });
 
   it("reports a non-negative latency for a local route", async () => {

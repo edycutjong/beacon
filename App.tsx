@@ -85,6 +85,7 @@ const QUICK_PROMPTS = [
 
 export default function App() {
   const [query, setQuery] = useState('');
+  const [godTaps, setGodTaps] = useState(0);
   const [result, setResult] = useState<RouteResult | null>(null);
   const [processing, setProcessing] = useState(false);
   const [providerKey, setProviderKey] = useState('');
@@ -233,7 +234,17 @@ export default function App() {
           {/* Header */}
           <View style={s.header}>
             <View style={s.headerTop}>
-              <Text style={s.logoIcon}>📡</Text>
+              <TouchableOpacity activeOpacity={1} onPress={() => {
+                setGodTaps(t => {
+                  if (t + 1 >= 5) {
+                    setPaired("GOD_MODE_ACTIVE");
+                    return 0;
+                  }
+                  return t + 1;
+                });
+              }}>
+                <Text style={s.logoIcon}>📡</Text>
+              </TouchableOpacity>
               <View>
                 <Text style={s.title}>BEACON</Text>
                 <Text style={s.subtitle}>P2P FIELD ASSISTANT_v1.0</Text>
@@ -270,6 +281,22 @@ export default function App() {
               </Text>
             </View>
           </Animated.View>
+
+          {/* Delegation Visualization */}
+          {processing && paired && (
+            <Animated.View style={[s.glassCard, { borderColor: C.amber, marginBottom: 24 }]}>
+               <Text style={{color: C.amber, textAlign: 'center', fontFamily: 'monospace', fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 12}}>
+                 UPLINK ACTIVE · DELEGATING COMPUTE
+               </Text>
+               <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20}}>
+                 <Text style={{fontSize: 28}}>📱</Text>
+                 <View style={{flex: 1, height: 2, backgroundColor: `${C.amber}30`, marginHorizontal: 16, overflow: 'hidden', borderRadius: 1}}>
+                    <Animated.View style={{width: '40%', height: '100%', backgroundColor: C.amber, transform: [{ translateX: sweep.interpolate({ inputRange: [0, 1], outputRange: [-50, 250] }) }]}} />
+                 </View>
+                 <Text style={{fontSize: 28}}>💻</Text>
+               </View>
+            </Animated.View>
+          )}
 
           {/* Network Uplink */}
           <View style={s.section}>

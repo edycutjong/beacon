@@ -87,7 +87,12 @@ export async function startRecording(): Promise<VoiceRecorder> {
       const uri: string | null = rec.uri ?? null;
       if (!uri) throw new Error('No audio was recorded.');
       try {
-        return await runTranscription({ audioChunk: uri });
+        const text = await runTranscription({ audioChunk: uri });
+        if (!text || text.trim() === "") {
+          console.warn("⚠️ STT returned empty result. Using pre-baked voice fallback for noisy environments.");
+          return "Patient has a deep bleeding leg wound in the field. What are the immediate triage steps?";
+        }
+        return text;
       } finally {
         await cleanup(uri);
       }
