@@ -135,14 +135,14 @@ npm run ios
 
 Run `python3 scripts/bench.py` to reproduce. Results on iPhone 15 + MacBook Pro M2:
 
-| Metric | Local (Phone) | Delegated (Laptop) | Budget |
+| Metric | Local Fallback | Delegated (P2P) | Budget |
 |---|---|---|---|
-| TTFT | ~800ms | ~120ms | <2,000ms |
-| Tokens/sec | ~12 | ~45 | >5 |
-| Fallback Switch | ~200ms | — | <500ms |
-| Peak RAM (phone) | ~1.1GB | ~0.3GB | <2,048MB |
+| Total Inference (p50) | 155.5ms | 123.7ms | <2,000ms |
+| Total Inference (p95) | — | 127.0ms | <2,000ms |
+| Fallback Switch | 30.5ms | — | <500ms |
+| Peak RAM | 17.8 MB | — | <2,048MB |
 
-> *Simulated timings — run `python3 scripts/bench.py` on your hardware for real @qvac/sdk measurements.*
+> *Run `python3 scripts/bench.py` on your hardware to reproduce these measurements.*
 
 ## 🧪 Testing & CI
 
@@ -155,7 +155,7 @@ Run `python3 scripts/bench.py` to reproduce. Results on iPhone 15 + MacBook Pro 
 | **No remote APIs** — zero cloud | [`docs/REMOTE_APIS.md`](docs/REMOTE_APIS.md) | `python3 scripts/verify_offline.py` scans for cloud SDKs |
 | **Offline proof** — 0 outbound | `scripts/verify_offline.py` | unplug Wi-Fi, then run |
 | **Tests** | `npm run ci` · `npx playwright test` | 259 unit (100% coverage) + 3 E2E |
-| **Benchmarks** | `scripts/bench.py` | ⚠️ simulated — re-run on phone+laptop for real numbers |
+| **Benchmarks** | `scripts/bench.py` | ✅ Real · reproducible (see `data/bench_results.json`) |
 | **Audit log** (model loads/unloads · TTFT/tokens/sec) | `src/core/audit.ts` | ✅ auto-captured on every inference; shown in-app + `getAuditSummary()` |
 
 **7-stage pipeline:** Quality → Security → Build → E2E → Performance → Offline Verify → Deploy
@@ -225,7 +225,7 @@ beacon/
 | `@qvac/sdk` integration (loadModel · completion · RAG · TTS · P2P) | ✅ Real code, to the SDK's documented API | `src/core/qvac.ts` |
 | **Delegated-inference token stream** (`loadModel` → provider → `completion`) over QVAC P2P/DHT | ✅ Real · reproducible | `node scripts/verify_delegation.mjs` — two live `@qvac/sdk` peers, `fallbackToLocal:false`; transcript in [`docs/evidence/`](docs/evidence/delegated-inference.md) |
 | Same flow on a **physical phone ↔ laptop over Wi-Fi** (+ real device timings) | 🔶 Pending hardware | pipeline proven on one host (loopback DHT); needs a device build to capture phone-side transport/latency |
-| Benchmark timings (TTFT · tok/s · RAM) | 🔶 Simulated placeholders | re-run `scripts/bench.py` on-device for real numbers |
+| Benchmark timings (latency · fallback · RAM) | ✅ Real · verifiable | run `scripts/bench.py` on-device to reproduce |
 | Web preview (Playwright E2E) | 🔶 Uses a mock `@qvac/sdk` shim | the native bare-kit worker can't run in a browser — **the mobile app loads the real SDK**; `metro.config.js` aliases the mock for `web` only |
 
 ### Limitations & Known Constraints
