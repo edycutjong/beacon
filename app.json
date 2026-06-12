@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Beacon",
-    "slug": "dorahacks-qvec-beacon",
+    "slug": "beacon",
     "version": "1.0.0",
     "scheme": "beacon",
     "orientation": "portrait",

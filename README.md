@@ -228,7 +228,7 @@ beacon/
 | Benchmark timings (TTFT · tok/s · RAM) | 🔶 Simulated placeholders | re-run `scripts/bench.py` on-device for real numbers |
 | Web preview (Playwright E2E) | 🔶 Uses a mock `@qvac/sdk` shim | the native bare-kit worker can't run in a browser — **the mobile app loads the real SDK**; `metro.config.js` aliases the mock for `web` only |
 
-**Known deployment constraints**
+### Limitations & Known Constraints
 1. Peers must share a local network (Wi-Fi Direct / hotspot) — by design; there is no internet relay.
 2. NFC tap-to-pair and camera/vision need a physical device (no simulator); iOS NFC also needs a paid Apple Developer account to sign the entitlement.
 

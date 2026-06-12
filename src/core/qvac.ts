@@ -85,6 +85,27 @@ export interface P2PDelegateParams {
 
 // ── Model Loaders ──────────────────────────────────────────────────────────
 
+// ── iOS Simulator escape hatch ───────────────────────────────────────────────
+// The iOS Simulator's Metal driver can't allocate the no-copy GPU buffers
+// llama.cpp/ggml rely on, so on-device GPU inference traps (EXC_BREAKPOINT in
+// MTLSimDevice). Set EXPO_PUBLIC_FORCE_CPU=1 when running on the simulator to
+// route on-device inference through the CPU instead — slower, but it runs.
+// Off by default, so real devices keep full Metal/GPU acceleration. Delegated
+// inference is unaffected (it executes on the paired laptop, not here).
+const FORCE_CPU = (() => {
+  const v = process.env.EXPO_PUBLIC_FORCE_CPU;
+  return !!v && v !== "0" && v.toLowerCase() !== "false";
+})();
+
+/** CPU override for llama/vision/embeddings configs (ggml `device`/`gpu_layers`). */
+function cpuLlmConfig(): Record<string, unknown> {
+  return FORCE_CPU ? { device: "cpu", gpu_layers: 0 } : {};
+}
+/** CPU override for whisper transcription config (`use_gpu`). */
+function cpuWhisperConfig(): Record<string, unknown> {
+  return FORCE_CPU ? { use_gpu: false } : {};
+}
+
 export async function loadLLMModel(modelSrc: any = LLAMA_MODEL_ID, delegateParams?: P2PDelegateParams) {
   try {
     // SDK expects modelSrc as the full descriptor constant (e.g. LLAMA_3_2_1B_INST_Q4_0),
@@ -94,6 +115,8 @@ export async function loadLLMModel(modelSrc: any = LLAMA_MODEL_ID, delegateParam
       modelType: "llamacpp-completion",
       modelConfig: {
         ctx_size: 4096,
+        // Local inference only — when delegating, the laptop keeps its GPU.
+        ...(delegateParams ? {} : cpuLlmConfig()),
       },
     };
 
@@ -127,6 +150,7 @@ export async function loadVisionModel(delegateParams?: P2PDelegateParams) {
       modelConfig: {
         ctx_size: 4096,
         projectionModelSrc: VISION_PROJECTION_ID,
+        ...(delegateParams ? {} : cpuLlmConfig()),
       },
     };
 
@@ -152,10 +176,9 @@ export async function loadVisionModel(delegateParams?: P2PDelegateParams) {
 export async function loadEmbeddingModel(modelSrc: any = EMBEDDING_MODEL_ID) {
   try {
     const tLoad = Date.now();
-    const modelId = await loadModel({
-      modelSrc,
-      modelType: "embeddings",
-    } as any);
+    const embedParams: any = { modelSrc, modelType: "embeddings" };
+    if (FORCE_CPU) embedParams.modelConfig = cpuLlmConfig();
+    const modelId = await loadModel(embedParams);
     recordModelLoad(modelId, "embeddings", Date.now() - tLoad);
     return modelId;
   } catch (error) {
@@ -192,6 +215,7 @@ export async function loadSTTModel(modelSrc: any = STT_MODEL_ID) {
         audio_format: "f32le",
         language: "en",
         translate: false,
+        ...cpuWhisperConfig(),
       },
     } as any);
     recordModelLoad(modelId, "whisper", Date.now() - tLoad);
