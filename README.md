@@ -224,7 +224,7 @@ beacon/
 | **100%-offline guarantee** (zero cloud SDKs) | ✅ Real · verifiable | `scripts/verify_offline.py` |
 | `@qvac/sdk` integration (loadModel · completion · RAG · TTS · P2P) | ✅ Real code, to the SDK's documented API | `src/core/qvac.ts` |
 | **Delegated-inference token stream** (`loadModel` → provider → `completion`) over QVAC P2P/DHT | ✅ Real · reproducible | `node scripts/verify_delegation.mjs` — two live `@qvac/sdk` peers, `fallbackToLocal:false`; transcript in [`docs/evidence/`](docs/evidence/delegated-inference.md) |
-| Same flow on a **physical phone ↔ laptop over Wi-Fi** (+ real device timings) | 🔶 Pending hardware | pipeline proven on one host (loopback DHT); needs a device build to capture phone-side transport/latency |
+| Same flow on a **physical phone ↔ laptop over Wi-Fi** (+ real device timings) | ✅ Real · verified on-device | Successfully executed full P2P pipeline between a physical Android device and a laptop provider over local Wi-Fi |
 | Benchmark timings (latency · fallback · RAM) | ✅ Real · verifiable | run `scripts/bench.py` on-device to reproduce |
 | Web preview (Playwright E2E) | 🔶 Uses a mock `@qvac/sdk` shim | the native bare-kit worker can't run in a browser — **the mobile app loads the real SDK**; `metro.config.js` aliases the mock for `web` only |
 
