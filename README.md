@@ -11,10 +11,10 @@
    ```
    Pair phone → laptop (scan QR · tap NFC · or paste key), send a heavy query (or a field photo) → topology shows **DELEGATED → laptop**; stop the provider → it **auto-falls back** to the on-device model (badge flips to LOCAL).
 3. **Verify offline:** `make verify` (unplug Wi-Fi first) — scans for banned cloud-SDK imports + asserts network isolation.
-4. **Tests & metrics:** `make ci` — lint + typecheck + **259 unit tests at 100% coverage** (routing decisions, multimodal vision routing, Ed25519 pairing, QR/NFC/deeplink key parsing, fallback, on-device audit log, UI components). `make bench` — local-vs-delegated latency + fallback-switch budgets.
+4. **Tests & metrics:** `make ci` — lint + typecheck + **265 unit tests at 100% coverage** (routing decisions, multimodal vision routing, Ed25519 pairing, QR/NFC/deeplink key parsing, fallback, on-device audit log, UI components). `make bench` — local-vs-delegated latency + fallback-switch budgets.
 5. **No remote APIs** ([docs/REMOTE_APIS.md](docs/REMOTE_APIS.md)) — all inference is local via `@qvac/sdk`; the P2P link stays on local Wi-Fi and never touches the internet.
 
-> ℹ️ **Real vs. simulated, up front:** the routing/fallback engine, Ed25519 pairing, offline RAG, the audit log, the **100%-offline guarantee**, and a **real delegated-inference token stream** over QVAC's P2P/DHT are all real and verifiable — 259 unit tests at 100% coverage, *plus* `node scripts/verify_delegation.mjs`, which delegates a live completion between two `@qvac/sdk` peers with on-device fallback **disabled** (transcript in [`docs/evidence/`](docs/evidence/delegated-inference.md)). What's still pending real hardware is that same flow on a **physical phone ↔ laptop over Wi-Fi** and the device-side timings below. Full breakdown: [**Proof Status — Real vs. Simulated**](#-proof-status--real-vs-simulated). We'd rather state that plainly than stage a fake screenshot.
+> ℹ️ **Real vs. simulated, up front:** the routing/fallback engine, Ed25519 pairing, offline RAG, the audit log, the **100%-offline guarantee**, and a **real delegated-inference token stream** over QVAC's P2P/DHT are all real and verifiable — 265 unit tests at 100% coverage, *plus* `node scripts/verify_delegation.mjs`, which delegates a live completion between two `@qvac/sdk` peers with on-device fallback **disabled** (transcript in [`docs/evidence/`](docs/evidence/delegated-inference.md)). What's still pending real hardware is that same flow on a **physical phone ↔ laptop over Wi-Fi** and the device-side timings below. Full breakdown: [**Proof Status — Real vs. Simulated**](#-proof-status--real-vs-simulated). We'd rather state that plainly than stage a fake screenshot.
 
 ---
 
@@ -30,6 +30,7 @@
   [![Track](https://img.shields.io/badge/Track-Mobile-06b6d4?style=for-the-badge)](https://dorahacks.io/hackathon/qvac-unleach-edge-ai-i/tracks/#mobile)
   [![Download APK](https://img.shields.io/badge/Download-APK%20(Latest_Build)-22c55e?style=for-the-badge&logo=android)](https://nightly.link/edycutjong/beacon/workflows/ci/main/beacon-release-apk.zip)
   [![Track](https://img.shields.io/badge/Track-Psy_Models_(MedPsy)-ef4444?style=for-the-badge)](https://dorahacks.io/hackathon/qvac-unleach-edge-ai-i/tracks/#psy-models-medpsy)
+  [![Demo Video](https://img.shields.io/badge/Demo-Video_YouTube-FF0000?style=for-the-badge&logo=youtube)](https://youtu.be/148A6cm2VDM)
 
   <br/>
 
@@ -146,7 +147,7 @@ Real-world telemetry captured from a physical Android device delegating heavy in
 
 ## 🧪 Testing & CI
 
-**259 unit tests (Vitest) at 100% coverage** (statements · branches · functions · lines) covering the local-vs-delegate router, multimodal vision routing, Ed25519 P2P pairing, QR/NFC/deeplink key parsing, the auto-fallback path, the on-device audit log (model loads/unloads · TTFT · tokens/sec), and the UI components, plus **3 E2E suites (Playwright)** and the offline-verification checks.
+**265 unit tests (Vitest) at 100% coverage** (statements · branches · functions · lines) covering the local-vs-delegate router, multimodal vision routing, Ed25519 P2P pairing, QR/NFC/deeplink key parsing, the auto-fallback path, the on-device audit log (model loads/unloads · TTFT · tokens/sec), and the UI components, plus **3 E2E suites (Playwright)** and the offline-verification checks.
 
 ## 🔍 Verification & Compliance
 
@@ -154,7 +155,7 @@ Real-world telemetry captured from a physical Android device delegating heavy in
 |---|---|---|
 | **No remote APIs** — zero cloud | [`docs/REMOTE_APIS.md`](docs/REMOTE_APIS.md) | `python3 scripts/verify_offline.py` scans for cloud SDKs |
 | **Offline proof** — 0 outbound | `scripts/verify_offline.py` | unplug Wi-Fi, then run |
-| **Tests** | `npm run ci` · `npx playwright test` | 259 unit (100% coverage) + 3 E2E |
+| **Tests** | `npm run ci` · `npx playwright test` | 265 unit (100% coverage) + 3 E2E |
 | **Benchmarks** | `scripts/bench.py` | ✅ Real · reproducible (see `data/bench_results.json`) |
 | **Audit log** (model loads/unloads · TTFT/tokens/sec) | `src/core/audit.ts` | ✅ auto-captured on every inference; shown in-app + `getAuditSummary()` |
 
@@ -174,7 +175,7 @@ npm run lighthouse     # Lighthouse CI audit
 | Layer | Tool | Status |
 |---|---|---|
 | Code Quality | TypeScript strict · expo lint | ✅ |
-| Unit Testing | Vitest (259 tests · 100% coverage) | ✅ |
+| Unit Testing | Vitest (265 tests · 100% coverage) | ✅ |
 | E2E Testing | Playwright (3 suites) | ✅ |
 | Security (SAST) | CodeQL | ✅ |
 | Security (SCA) | Dependabot + npm audit | ✅ |
@@ -217,7 +218,7 @@ beacon/
 
 | Capability | Status | Evidence |
 |---|---|---|
-| Local-vs-delegate routing + auto-fallback | ✅ Real · unit-tested | `src/core/router.ts` — 259 tests, 100% coverage |
+| Local-vs-delegate routing + auto-fallback | ✅ Real · unit-tested | `src/core/router.ts` — 265 tests, 100% coverage |
 | Ed25519 pairing (QR · NFC · `beacon://` deeplink) | ✅ Real · unit-tested | `p2p.ts` · `pairingLink.ts` · `nfc.ts` |
 | Offline RAG citations (bundled field manual) | ✅ Real · unit-tested | `rag.ts` · `manual.ts` |
 | On-device audit log (TTFT · tok/s · load/unload) | ✅ Real · auto-captured | `audit.ts` |

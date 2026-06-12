@@ -117,16 +117,20 @@ export async function runRoute(query: string, isImage: boolean = false, imagePat
 
       const systemPrompt = systemPromptFor(hasImage, true, domain);
 
-      const response = await runCompletion({
-        modelId,
-        history: [
-          { role: "system", content: ground(systemPrompt, citations) },
-          userTurn
-        ],
-        stream: false
-      });
+      let response;
+      try {
+        response = await runCompletion({
+          modelId,
+          history: [
+            { role: "system", content: ground(systemPrompt, citations) },
+            userTurn
+          ],
+          stream: false
+        });
+      } finally {
+        await unloadQVACModel(modelId);
+      }
 
-      await unloadQVACModel(modelId);
       const latencyMs = Date.now() - tStart;
 
       return {
@@ -151,16 +155,20 @@ export async function runRoute(query: string, isImage: boolean = false, imagePat
 
   const systemPrompt = systemPromptFor(hasImage, false, domain);
 
-  const response = await runCompletion({
-    modelId,
-    history: [
-      { role: "system", content: ground(systemPrompt, citations) },
-      userTurn
-    ],
-    stream: false
-  });
+  let response;
+  try {
+    response = await runCompletion({
+      modelId,
+      history: [
+        { role: "system", content: ground(systemPrompt, citations) },
+        userTurn
+      ],
+      stream: false
+    });
+  } finally {
+    await unloadQVACModel(modelId);
+  }
 
-  await unloadQVACModel(modelId);
   const latencyMs = Date.now() - tStart;
 
   return {
