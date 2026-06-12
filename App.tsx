@@ -438,9 +438,9 @@ export default function App() {
           )}
 
           {/* Delegation performance — local vs mesh, from real session telemetry */}
-          {perf.delegated && (
+          {(perf.local || perf.delegated) && (
             <View style={s.section}>
-              <Text style={s.sectionTitle}>[ DELEGATION PERFORMANCE ]</Text>
+              <Text style={s.sectionTitle}>[ {perf.delegated ? 'DELEGATION' : 'ON-DEVICE'} PERFORMANCE ]</Text>
               <View style={s.glassCard}>
                 {perf.latencySpeedup != null && perf.latencySpeedup >= 1 && (
                   <View style={s.perfHeadline}>
