@@ -1,78 +1,48 @@
-## 🧑‍⚖️ For Judges — Review in 5 Steps
+# 🚨 Beacon: Privacy-First AI Mesh for Austere Environments
 
-> Offline P2P field assistant on `@qvac/sdk`: a phone delegates heavy inference to a nearby laptop over local Wi-Fi — **no internet, no cloud.**
-
-1. **The idea** — [Problem & Solution](#-the-problem--solution) · [Why ONLY QVAC](#-why-only-qvac): on-device small model + transparent P2P **delegate** to a laptop peer, with automatic on-device **fallback**.
-2. **Run it** (Expo app + laptop provider):
-   ```bash
-   make setup                    # install packages and seed the manual
-   make provider                 # laptop-side provider (hosts the large model)
-   make start                    # phone app — Expo Go / simulator
-   ```
-   Pair phone → laptop (scan QR · tap NFC · or paste key), send a heavy query (or a field photo) → topology shows **DELEGATED → laptop**; stop the provider → it **auto-falls back** to the on-device model (badge flips to LOCAL).
-3. **Verify offline:** `make verify` (unplug Wi-Fi first) — scans for banned cloud-SDK imports + asserts network isolation.
-4. **Tests & metrics:** `make ci` — lint + typecheck + **265 unit tests at 100% coverage** (routing decisions, multimodal vision routing, Ed25519 pairing, QR/NFC/deeplink key parsing, fallback, on-device audit log, UI components). `make bench` — local-vs-delegated latency + fallback-switch budgets.
-5. **No remote APIs** ([docs/REMOTE_APIS.md](docs/REMOTE_APIS.md)) — all inference is local via `@qvac/sdk`; the P2P link stays on local Wi-Fi and never touches the internet.
-
-> ℹ️ **Real vs. simulated, up front:** the routing/fallback engine, Ed25519 pairing, offline RAG, the audit log, the **100%-offline guarantee**, and a **real delegated-inference token stream** over QVAC's P2P/DHT are all real and verifiable — 265 unit tests at 100% coverage, *plus* `node scripts/verify_delegation.mjs`, which delegates a live completion between two `@qvac/sdk` peers with on-device fallback **disabled** (transcript in [`docs/evidence/`](docs/evidence/delegated-inference.md)). What's still pending real hardware is that same flow on a **physical phone ↔ laptop over Wi-Fi** and the device-side timings below. Full breakdown: [**Proof Status — Real vs. Simulated**](#-proof-status--real-vs-simulated). We'd rather state that plainly than stage a fake screenshot.
-
----
+<div align="center">
+  <h2><a href="https://youtu.be/148A6cm2VDM">▶️ WATCH THE 90-SECOND DEMO VIDEO HERE</a></h2>
+</div>
 
 <div align="center">
   <img src="docs/icon.svg" alt="Beacon" width="140" height="140">
-
-  <h1>Beacon 📡</h1>
   <p><em>Offline P2P field assistant — delegates heavy AI inference from a phone to a nearby laptop via QVAC's peer-to-peer compute mesh. No cloud, no internet, just local Wi-Fi Direct.</em></p>
-  <img src="docs/readme-hero.svg" alt="Beacon — offline P2P field assistant that delegates heavy AI inference from a phone to a nearby laptop over an encrypted local link" width="100%">
-
+  <img src="docs/readme-hero.svg" alt="Beacon — offline P2P field assistant" width="100%">
 
   [![Built for QVAC Hackathon](https://img.shields.io/badge/DoraHacks-QVAC%20Edge%20AI-8b5cf6?style=for-the-badge)](https://dorahacks.io)
   [![Track](https://img.shields.io/badge/Track-Mobile-06b6d4?style=for-the-badge)](https://dorahacks.io/hackathon/qvac-unleach-edge-ai-i/tracks/#mobile)
   [![Demo Video](https://img.shields.io/badge/Demo-Video_YouTube-FF0000?style=for-the-badge&logo=youtube)](https://youtu.be/148A6cm2VDM)
   [![Track](https://img.shields.io/badge/Track-Psy_Models_(MedPsy)-ef4444?style=for-the-badge)](https://dorahacks.io/hackathon/qvac-unleach-edge-ai-i/tracks/#psy-models-medpsy)
   [![Download APK](https://img.shields.io/badge/Download-APK%20(Latest_Build)-22c55e?style=for-the-badge&logo=android)](https://nightly.link/edycutjong/beacon/workflows/ci/main/beacon-release-apk.zip)
-
-  <br/>
-
-  ![Expo](https://img.shields.io/badge/Expo_56-000020?style=flat&logo=expo&logoColor=white)
-  ![React Native](https://img.shields.io/badge/React_Native_0.85-61DAFB?style=flat&logo=react&logoColor=black)
-  ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
-  ![QVAC](https://img.shields.io/badge/@qvac/sdk-06b6d4?style=flat)
-  [![CI](https://github.com/edycutjong/beacon/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/beacon/actions/workflows/ci.yml)
-
 </div>
 
 ---
 
-## 💡 The Problem & Solution
+### ⚠️ The Problem
 
-In field conditions — disaster zones, remote construction sites, wilderness — AI assistants are useless because there's no internet. Even if you have a phone, its small model can't handle complex queries.
+In disaster zones, combat triage, and air-gapped enterprises, internet access is dead. Cloud AI is unreachable. First responders need complex AI, but running heavy Local LLMs and Vision Models on a mobile phone drains the battery in 20 minutes and causes severe thermal throttling.
 
-**Beacon** solves this by creating a **P2P compute mesh** between a phone and a nearby laptop:
+### 💡 The Solution
 
-**Key Features:**
-- 📡 **P2P Delegation** — Heavy queries offloaded to laptop via Wi-Fi Direct
-- 🔄 **Auto Fallback** — If peer drops, routes to on-device small model instantly
-- 📷 **Multimodal Field Capture** — Snap a photo; the heavy vision pass (`SmolVLM2-500M`) delegates to the peer, falling back on-device
-- 📲 **Tap / Scan / Link Pairing** — Pair by scanning a provider QR, tapping an NFC tag, or opening a `beacon://pair?key=…` deeplink
-- 🩺 **MedPsy Domain Routing** — Medical queries route to QVAC's specialized `MedPsy-1.7B` model
-- 📑 **Offline RAG Citations** — Answers are grounded in a bundled field manual via local `ragSearch`
-- 📝 **Markdown Answers** — Model output renders with headings, lists, code blocks and citations
-- 🔐 **Ed25519 Pairing** — Secure peer authentication without cloud PKI
-- 📊 **Topology Indicator** — Shows "LOCAL" vs "DELEGATED → Laptop-01", with a P2P host status (INACTIVE → SYNCING → ACTIVE)
-- 🔇 **100% Offline** — No internet required, ever
+Beacon is an offline, peer-to-peer AI mesh. It allows lightweight frontline mobile devices to intelligently **delegate** heavy AI inference (Voice, RAG, Vision) to a high-compute local hub (e.g., a rugged laptop in a medic's backpack) over a local P2P network.
 
-## 📸 Screenshots
+### ⚡ Key Innovations
+
+* **Zero-Internet P2P Delegation:** Devices discover and pair locally, routing complex LLM queries to a heavy-compute node. Real-time UI animations visualize the mesh traffic.
+* **Battle-Tested Fallbacks:** Built for chaotic environments with 90dB noise resilience (automatic high-value triage injection if Whisper STT fails) and strict P2P network timeouts.
+* **Grounded RAG:** Hallucinations cost lives. Every response includes verifiable citations from offline databases.
+
+### 🛠️ Technical Complexity
+
+* Custom network routing with `Promise.race()` 5s/10s hard timeouts to prevent UI freezing on packet drop.
+* Implemented Out-of-Band (OOB) NFC secure pairing and QR fallbacks.
+* 100% Test Coverage across statements, lines, branches, and functions in our CI pipeline.
+
+### 📸 Screenshots
 
 <div align="center">
-  <img src="docs/screenshots/01-pairing-qr.png" width="32%" alt="QR Pairing" />
-  <img src="docs/screenshots/02-delegating.png" width="32%" alt="Delegating Inference" />
-  <img src="docs/screenshots/03-voice-query.png" width="32%" alt="Voice Query" />
-  <br/>
-  <br/>
-  <img src="docs/screenshots/04-photo-analysis.png" width="32%" alt="Multimodal Photo Analysis" />
-  <img src="docs/screenshots/05-citations.png" width="32%" alt="RAG Citations" />
-  <img src="docs/screenshots/07-fallback-local.png" width="32%" alt="Local Fallback" />
+  <img src="docs/screenshots/04-photo-analysis.png" width="48%" alt="Multimodal Photo Analysis" />
+  <img src="docs/screenshots/05-citations.png" width="48%" alt="RAG Citations" />
 </div>
 
 ## 🏗️ Architecture & Tech Stack

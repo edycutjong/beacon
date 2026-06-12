@@ -339,10 +339,15 @@ export default function App() {
                   >
                     <Text style={s.nfcIcon}>📶</Text>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.nfcTitle}>TAP TO PAIR · NFC</Text>
-                      <Text style={s.scanSub}>Touch your phone to a provider node</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={s.nfcTitle}>TAP TO PAIR · NFC</Text>
+                        <View style={{ backgroundColor: `${C.amber}20`, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: `${C.amber}60` }}>
+                          <Text style={{ color: C.amber, fontSize: 8, fontFamily: 'monospace', fontWeight: 'bold' }}>EXPERIMENTAL</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 11, color: C.text2, marginTop: 3 }}>Touch your phone to a provider node</Text>
                     </View>
-                    <Text style={s.scanChevron}>›</Text>
+                    <Text style={{ fontSize: 26, color: C.green, fontWeight: '300' }}>›</Text>
                   </TouchableOpacity>
                 )}
 
@@ -646,13 +651,13 @@ const s = StyleSheet.create({
 
   glassCard: { backgroundColor: C.glass, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 16 },
 
-  scanBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: `${C.cyan}12`, borderWidth: 1, borderColor: `${C.cyan}55`, borderRadius: 10, padding: 16 },
-  scanIcon: { fontSize: 26, color: C.cyan },
-  scanTitle: { fontSize: 13, fontWeight: '900', color: C.cyan, letterSpacing: 1.5, fontFamily: 'monospace' },
-  scanSub: { fontSize: 11, color: C.text2, marginTop: 3 },
-  scanChevron: { fontSize: 26, color: C.cyan, fontWeight: '300' },
+  scanBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: C.cyan, borderWidth: 1, borderColor: C.cyan, borderRadius: 10, padding: 16 },
+  scanIcon: { fontSize: 26, color: C.bg },
+  scanTitle: { fontSize: 13, fontWeight: '900', color: C.bg, letterSpacing: 1.5, fontFamily: 'monospace' },
+  scanSub: { fontSize: 11, color: C.bg, marginTop: 3, opacity: 0.8 },
+  scanChevron: { fontSize: 26, color: C.bg, fontWeight: '300' },
 
-  nfcBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: `${C.green}10`, borderWidth: 1, borderColor: `${C.green}45`, borderRadius: 10, padding: 16, marginTop: 12 },
+  nfcBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: 'transparent', borderWidth: 1, borderColor: `${C.green}45`, borderRadius: 10, padding: 16, marginTop: 12 },
   nfcIcon: { fontSize: 24 },
   nfcTitle: { fontSize: 13, fontWeight: '900', color: C.green, letterSpacing: 1.5, fontFamily: 'monospace' },
 
