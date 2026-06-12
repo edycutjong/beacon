@@ -434,7 +434,7 @@ export default function App() {
           )}
 
           {/* Delegation performance — local vs mesh, from real session telemetry */}
-          {(perf.local || perf.delegated) && (
+          {perf.delegated && (
             <View style={s.section}>
               <Text style={s.sectionTitle}>[ DELEGATION PERFORMANCE ]</Text>
               <View style={s.glassCard}>
