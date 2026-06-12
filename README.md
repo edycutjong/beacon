@@ -1,5 +1,26 @@
 # 🚨 Beacon: Privacy-First AI Mesh for Austere Environments
 
+## 🧑‍⚖️ For Judges — Review in 5 Steps
+
+> Offline P2P field assistant on `@qvac/sdk`: delegates heavy AI inference from a phone to a nearby laptop via QVAC's peer-to-peer compute mesh. No cloud, no internet, just local Wi-Fi Direct.
+
+1. **The idea** — [The Problem](#-the-problem) & [The Solution](#-the-solution) · [Why ONLY QVAC](#-why-only-qvac): **P2P compute delegation** (offload heavy LLM/Vision/RAG to a trusted local peer) + local fallback via `@qvac/sdk`.
+2. **Run it** (Native Build Required):
+   > ⚠️ **Expo Go is NOT supported** because `@qvac/sdk` uses custom C++ native modules.
+   ```bash
+   npm install && python3 scripts/seed.py  # install packages and seed the manual
+   npm run provider                        # Start laptop provider
+   npm run ios                             # Build and launch the real native iOS app
+   ```
+   Pair phone and laptop natively via QR/NFC → ask a complex medical or vision query → watch the inference correctly route to the heavy-compute peer. Real-time UI animations visualize the mesh traffic.
+3. **Verify offline:** `python3 scripts/verify_offline.py` (disconnect network first) — cloud-import scan + network isolation.
+4. **Tests & metrics:** `npm run ci` — typecheck + **265 unit tests** at 100% coverage (local-vs-delegate router, P2P pairing, RAG citations, multimodal routing, on-device audit log) + **3 E2E suites**. `python3 scripts/bench.py` — inference latency and RAM usage.
+5. **No remote APIs** ([docs/REMOTE_APIS.md](docs/REMOTE_APIS.md)) — completion, RAG, TTS, vision, and P2P networking all run locally via `@qvac/sdk`; data never leaves the local mesh.
+
+> ⚠️ **Austere Environment Design** — Built for disaster zones and combat triage. The zero-internet P2P delegation, strict network timeouts (preventing UI freeze on packet drop), and fallback routing logic are real and unit-tested.
+
+---
+
 <div align="center">
   <h2><a href="https://youtu.be/148A6cm2VDM">▶️ WATCH THE 90-SECOND DEMO VIDEO HERE</a></h2>
 </div>
