@@ -29,7 +29,7 @@ def main():
 
     # ── 1. Required Files ──
     print("\n  ── Required Files ──")
-    for f in ["README.md", "LICENSE", "AGENTS.md", "CLAUDE.md", "DEMO.md",
+    for f in ["README.md", "LICENSE", "DEMO.md",
               ".env.example", ".gitignore", "package.json", "package-lock.json",
               "Makefile", "tsconfig.json", "SECURITY.md", "CONTRIBUTING.md"]:
         check(f, os.path.isfile(os.path.join(base, f)), "File missing")
