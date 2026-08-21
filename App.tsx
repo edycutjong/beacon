@@ -228,7 +228,13 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={s.container}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+        {/* RN 0.87 removed StatusBar's backgroundColor/translucent props — Android
+            status bars are always edge-to-edge/transparent now (deprecated by
+            Android 15 API 35 well before that). No visual change here: the
+            container behind it already paints C.bg (see styles.container),
+            so the status bar area shows through with the same color it always
+            had. barStyle is untouched — that prop still exists in 0.87. */}
+        <StatusBar barStyle="light-content" />
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
           {/* Header */}
