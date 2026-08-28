@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "main": "index.ts",
   "dependencies": {
-    "@qvac/sdk": "^0.12.2",
+    "@qvac/sdk": "^0.18.1",
     "expo": "^56.0.12",
     "expo-audio": "~57.0.3",
     "expo-build-properties": "~56.0.26",
