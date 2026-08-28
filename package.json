@@ -6,7 +6,7 @@
     "@qvac/sdk": "^0.12.2",
     "expo": "^56.0.12",
     "expo-audio": "~57.0.3",
-    "expo-build-properties": "~56.0.26",
+    "expo-build-properties": "~57.0.14",
     "expo-camera": "~56.0.8",
     "expo-linking": "~57.0.6",
     "expo-status-bar": "~56.0.4",
