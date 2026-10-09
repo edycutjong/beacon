@@ -33,7 +33,7 @@ jobs:
         upload: true
         output: ${{ runner.temp }}/results
     - name: Upload CodeQL SARIF as Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: codeql-results-${{ matrix.language }}
         path: ${{ runner.temp }}/results
